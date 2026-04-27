@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "593161257656",
+    "project_id": "tfg-controlhorario",
+    "storage_bucket": "tfg-controlhorario.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:593161257656:android:db7ba208220732d3852a4d",
+        "android_client_info": {
+          "package_name": "com.example.tfg_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAq3HvQAVY5spnFjOwD_mT_9NXpLvgdQ4M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
