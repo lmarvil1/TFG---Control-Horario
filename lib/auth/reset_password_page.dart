@@ -1,6 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+/// Pantalla para la recuperación de contraseña.
+/// Permite al usuario solicitar un correo de restablecimiento de contraseña
+/// utilizando Firebase Authentication. Gestiona la validación del email,
+/// el estado de carga y la presentación de mensajes de éxito o error.
+
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
 
@@ -9,17 +14,29 @@ class ResetPasswordPage extends StatefulWidget {
 }
 
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
+  // Controlador del campo de email
   final _email = TextEditingController();
+
+  // Mensaje de éxito mostrado al usuario
   String? _msg;
+
+  // Mensaje de error mostrado al usuario
   String? _error;
+
+  // Indica si se está procesando la solicitud
   bool _loading = false;
 
   @override
   void dispose() {
+    // Liberación del controlador para evitar fugas de memoria
     _email.dispose();
     super.dispose();
   }
 
+  /// Envía la solicitud de restablecimiento de contraseña.
+  /// - Valida que el email no esté vacío
+  /// - Llama a Firebase Auth para enviar el correo
+  /// - Gestiona mensajes de éxito y error
   Future<void> _reset() async {
     setState(() {
       _loading = true;
@@ -30,6 +47,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     try {
       final email = _email.text.trim();
 
+      // Validación del campo email
       if (email.isEmpty) {
         throw FirebaseAuthException(
           code: 'empty-email',
@@ -37,29 +55,35 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         );
       }
 
+      // Envío del email de recuperación mediante Firebase
       await FirebaseAuth.instance.sendPasswordResetEmail(
         email: email,
       );
 
+      // Mensaje de confirmación al usuario
       setState(() {
-        _msg = '📩 Email enviado correctamente';
+        _msg = 'Email enviado correctamente';
       });
 
     } on FirebaseAuthException catch (e) {
+      // Manejo de errores específicos de Firebase
       setState(() {
         _error = _friendlyError(e);
       });
     } catch (e) {
+      // Manejo genérico de errores no controlados
       setState(() {
         _error = 'Error inesperado';
       });
     } finally {
+      // Se asegura de actualizar el estado solo si el widget sigue activo
       if (mounted) {
         setState(() => _loading = false);
       }
     }
   }
 
+  /// Traduce los códigos de error de Firebase a mensajes comprensibles.
   String _friendlyError(FirebaseAuthException e) {
     switch (e.code) {
       case 'empty-email':
@@ -78,11 +102,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Barra superior con título descriptivo
       appBar: AppBar(title: const Text('Recuperar contraseña')),
+
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // Campo de entrada de email
             TextField(
               controller: _email,
               keyboardType: TextInputType.emailAddress,
@@ -90,8 +117,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                 labelText: 'Email',
               ),
             ),
+
             const SizedBox(height: 16),
 
+            // Botón para enviar la solicitud
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -108,12 +137,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
             const SizedBox(height: 12),
 
+            // Mensaje de éxito
             if (_msg != null)
               Text(
                 _msg!,
                 style: const TextStyle(color: Colors.green),
               ),
 
+            // Mensaje de error
             if (_error != null)
               Text(
                 _error!,

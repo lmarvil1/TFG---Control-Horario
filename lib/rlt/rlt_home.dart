@@ -5,11 +5,15 @@ import '../admin/admin_incidents_page.dart';
 import '../admin/employee_punches_page.dart';
 import '../admin/users_page.dart';
 
+/// Pantalla principal del rol RLT (Representación Legal de los Trabajadores).
+/// Este panel permite el acceso en modo consulta a información relevante
+/// sobre empleados, fichajes e incidencias, sin capacidad de modificación.
 class RltHome extends StatelessWidget {
   const RltHome({super.key});
 
   @override
   Widget build(BuildContext context) {
+    /// Opciones disponibles en el panel RLT.
     final items = [
       _RltItem(
         title: 'Ver empleados',
@@ -68,6 +72,7 @@ class RltHome extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            // Adaptación de diseño en función del tamaño de pantalla
             final isWide = constraints.maxWidth >= 900;
             final horizontalPadding = isWide ? 24.0 : 16.0;
             final maxContentWidth = isWide ? 1100.0 : 620.0;
@@ -80,7 +85,9 @@ class RltHome extends StatelessWidget {
                       BoxConstraints(minHeight: constraints.maxHeight - 32),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: maxContentWidth),
+
                     child: isWide
+                        // Diseño para pantallas grandes (grid)
                         ? Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -93,16 +100,21 @@ class RltHome extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
+
+                              // Aviso de modo consulta
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: Colors.orange.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                                  border: Border.all(
+                                      color: Colors.orange.withOpacity(0.4)),
                                 ),
                                 child: const Row(
                                   children: [
-                                    Icon(Icons.visibility, size: 18, color: Colors.orange),
+                                    Icon(Icons.visibility,
+                                        size: 18, color: Colors.orange),
                                     SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -117,6 +129,8 @@ class RltHome extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
+
+                              // Descripción funcional del rol
                               const Text(
                                 'Representación Legal de los Trabajadores (RLT) de los empleados, tiene acceso a los registros de jornada en modo consulta para supervisar el cumplimiento de la normativa laboral.',
                                 style: TextStyle(
@@ -125,6 +139,8 @@ class RltHome extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 24),
+
+                              // Panel en formato cuadrícula
                               GridView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
@@ -137,19 +153,24 @@ class RltHome extends StatelessWidget {
                                   childAspectRatio: 1.9,
                                 ),
                                 itemBuilder: (context, index) {
-                                  return _RltDashboardCard(item: items[index]);
+                                  return _RltDashboardCard(
+                                      item: items[index]);
                                 },
                               ),
                             ],
                           )
+
+                        // Diseño para pantallas pequeñas (lista)
                         : Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const SizedBox(height: 4),
                               ...items.map(
                                 (item) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 14),
-                                  child: _RltDashboardCard(item: item),
+                                  padding:
+                                      const EdgeInsets.only(bottom: 14),
+                                  child:
+                                      _RltDashboardCard(item: item),
                                 ),
                               ),
                             ],
@@ -165,6 +186,7 @@ class RltHome extends StatelessWidget {
   }
 }
 
+/// Representa una opción dentro del panel RLT.
 class _RltItem {
   final String title;
   final String subtitle;
@@ -179,6 +201,7 @@ class _RltItem {
   });
 }
 
+/// Tarjeta visual utilizada para mostrar una opción del panel.
 class _RltDashboardCard extends StatelessWidget {
   final _RltItem item;
 
@@ -200,11 +223,15 @@ class _RltDashboardCard extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Row(
             children: [
+              // Icono representativo
               Container(
                 width: 68,
                 height: 68,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withOpacity(0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
@@ -214,6 +241,8 @@ class _RltDashboardCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 18),
+
+              // Texto principal
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -242,7 +271,10 @@ class _RltDashboardCard extends StatelessWidget {
                   ],
                 ),
               ),
+
               const SizedBox(width: 8),
+
+              // Indicador de navegación
               const Icon(
                 Icons.arrow_forward_ios,
                 size: 18,

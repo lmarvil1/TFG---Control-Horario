@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../data/models/repositories/notifications_repository.dart';
 
+/// Pantalla de gestión de notificaciones del usuario.
+/// Permite consultar notificaciones, marcarlas como leídas,
+/// seleccionar varias y eliminarlas individualmente o en bloque.
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
 
@@ -10,12 +13,19 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
+  /// Repositorio encargado de acceder a las notificaciones.
   final NotificationsRepository repo = NotificationsRepository();
 
+  /// Indica si la pantalla está en modo selección múltiple.
   bool _selectionMode = false;
+
+  /// Conjunto de identificadores de notificaciones seleccionadas.
   final Set<String> _selectedIds = <String>{};
+
+  /// Evita lanzar varias operaciones de borrado simultáneamente.
   bool _busyDeleting = false;
 
+  /// Activa el modo selección y selecciona la notificación indicada.
   void _enterSelectionMode(String id) {
     setState(() {
       _selectionMode = true;
@@ -23,6 +33,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
     });
   }
 
+  /// Selecciona o deselecciona una notificación.
+  /// Si no queda ninguna seleccionada, se desactiva el modo selección.
   void _toggleSelection(String id) {
     setState(() {
       if (_selectedIds.contains(id)) {
@@ -37,6 +49,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     });
   }
 
+  /// Limpia la selección actual.
   void _clearSelection() {
     setState(() {
       _selectionMode = false;
@@ -44,6 +57,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     });
   }
 
+  /// Selecciona todas las notificaciones mostradas.
   void _selectAll(List<AppNotification> items) {
     setState(() {
       _selectionMode = true;
@@ -53,6 +67,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     });
   }
 
+  /// Elimina las notificaciones seleccionadas tras confirmación del usuario.
   Future<void> _deleteSelected() async {
     if (_selectedIds.isEmpty || _busyDeleting) return;
 
@@ -91,6 +106,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       await repo.deleteNotifications(_selectedIds.toList());
 
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -104,6 +120,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       _clearSelection();
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error eliminando notificaciones: $e'),
@@ -116,6 +133,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
+  /// Elimina todas las notificaciones del usuario tras confirmación.
   Future<void> _deleteAll(List<AppNotification> items) async {
     if (items.isEmpty || _busyDeleting) return;
 
@@ -148,6 +166,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       await repo.deleteAllMyNotifications();
 
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Todas las notificaciones han sido eliminadas'),
@@ -157,6 +176,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       _clearSelection();
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error eliminando todas las notificaciones: $e'),
@@ -173,9 +193,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        // Cambia el título cuando se activa la selección múltiple.
         title: _selectionMode
             ? Text('${_selectedIds.length} seleccionadas')
             : const Text('Notificaciones'),
+
+        // En modo selección, permite cancelar la selección.
         leading: _selectionMode
             ? IconButton(
                 icon: const Icon(Icons.close),
@@ -184,15 +207,20 @@ class _NotificationsPageState extends State<NotificationsPage> {
               )
             : null,
         actions: [
+          // Acción para marcar todas las notificaciones como leídas.
           if (!_selectionMode)
             TextButton(
               onPressed: () async {
                 try {
                   await repo.markAllAsRead();
-                } catch (_) {}
+                } catch (_) {
+                  // Si falla, no se bloquea la interfaz.
+                }
               },
               child: const Text('Marcar todas'),
             ),
+
+          // Menú de acciones generales.
           StreamBuilder<List<AppNotification>>(
             stream: repo.streamMyNotifications(),
             builder: (context, snap) {
@@ -219,6 +247,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
               );
             },
           ),
+
+          // Eliminación de notificaciones seleccionadas.
           if (_selectionMode)
             IconButton(
               tooltip: 'Eliminar seleccionadas',
@@ -231,6 +261,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       ),
       body: SafeArea(
         child: StreamBuilder<List<AppNotification>>(
+          // Escucha en tiempo real las notificaciones del usuario.
           stream: repo.streamMyNotifications(),
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
@@ -251,9 +282,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
             final items = snap.data ?? [];
 
+            // Limpia selecciones que ya no existan tras cambios en Firestore.
             if (_selectionMode) {
               final validIds = items.map((e) => e.id).toSet();
               _selectedIds.removeWhere((id) => !validIds.contains(id));
+
               if (_selectedIds.isEmpty) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted && _selectionMode) {
@@ -325,7 +358,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   trailing: _selectionMode
                       ? null
                       : (!n.isRead
-                          ? const Icon(Icons.circle, size: 10, color: Colors.red)
+                          ? const Icon(
+                              Icons.circle,
+                              size: 10,
+                              color: Colors.red,
+                            )
                           : null),
                   onLongPress: () => _enterSelectionMode(n.id),
                   onTap: () async {
@@ -334,10 +371,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       return;
                     }
 
+                    // Al abrir una notificación, se marca como leída.
                     if (!n.isRead) {
                       try {
                         await repo.markAsRead(n.id);
-                      } catch (_) {}
+                      } catch (_) {
+                        // No se interrumpe si falla la actualización.
+                      }
                     }
                   },
                 );
@@ -349,54 +389,47 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
+  /// Devuelve el icono correspondiente según el tipo de notificación.
   static IconData _iconForType(String type) {
     switch (type) {
       case 'incident_created':
         return Icons.report_problem_outlined;
-
       case 'incident_resolved':
         return Icons.check_circle_outline;
-
       case 'incident_rejected':
         return Icons.cancel_outlined;
-
       case 'vacation_requested':
         return Icons.beach_access_outlined;
-
       case 'vacation_approved':
         return Icons.check_circle_outline;
-
       case 'vacation_rejected':
         return Icons.cancel_outlined;
-
       case 'vacation_cancel_requested':
         return Icons.undo_rounded;
-
       case 'vacation_cancel_approved':
         return Icons.event_busy_outlined;
-
       case 'vacation_cancel_denied':
         return Icons.block_outlined;
-
       case 'justification_uploaded':
       case 'justification_reviewed':
         return Icons.description_outlined;
-
       case 'inspection_access':
         return Icons.verified_user_outlined;
-
       case 'punch_reminder':
         return Icons.schedule_outlined;
-
+      case 'payroll_uploaded':
+        return Icons.receipt_long_outlined;
       default:
         return Icons.notifications_outlined;
     }
   }
 
+  /// Formatea una fecha y hora en formato dd/mm/yyyy hh:mm.
   static String _formatDateTime(DateTime? dt) {
     if (dt == null) return 'Fecha desconocida';
 
     String two(int v) => v.toString().padLeft(2, '0');
+
     return '${two(dt.day)}/${two(dt.month)}/${dt.year} '
         '${two(dt.hour)}:${two(dt.minute)}';
   }

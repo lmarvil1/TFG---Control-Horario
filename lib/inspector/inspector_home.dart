@@ -7,15 +7,21 @@ import '../admin/admin_vacations_page.dart';
 import '../admin/employee_punches_page.dart';
 import '../admin/users_page.dart';
 
+/// Pantalla principal del rol de Inspección de Trabajo.
+/// Ofrece acceso en modo consulta a la información relevante para
+/// la verificación de registros laborales, sin permitir modificaciones.
 class InspectorHome extends StatelessWidget {
   const InspectorHome({super.key});
 
+  /// Cierra la sesión del usuario autenticado.
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
   }
 
   @override
   Widget build(BuildContext context) {
+    /// Opciones disponibles en el panel de inspección.
+    /// Cada elemento define el texto, icono y navegación correspondiente.
     final items = [
       _InspectorItem(
         title: 'Ver empleados',
@@ -98,6 +104,7 @@ class InspectorHome extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            // Adaptación del diseño según el ancho disponible.
             final isWide = constraints.maxWidth >= 900;
             final horizontalPadding = isWide ? 24.0 : 16.0;
             final maxContentWidth = isWide ? 1100.0 : 620.0;
@@ -111,6 +118,7 @@ class InspectorHome extends StatelessWidget {
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: maxContentWidth),
                     child: isWide
+                        // Diseño para pantallas grandes.
                         ? Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -123,16 +131,27 @@ class InspectorHome extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
+
+                              // Aviso visual de que el acceso es solo de consulta.
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.orange.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                                  border: Border.all(
+                                    color: Colors.orange.withOpacity(0.4),
+                                  ),
                                 ),
                                 child: const Row(
                                   children: [
-                                    Icon(Icons.visibility, size: 18, color: Colors.orange),
+                                    Icon(
+                                      Icons.visibility,
+                                      size: 18,
+                                      color: Colors.orange,
+                                    ),
                                     SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -147,6 +166,8 @@ class InspectorHome extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
+
+                              // Texto descriptivo del alcance funcional del rol.
                               const Text(
                                 'Inspección de Trabajo tiene acceso remoto y en tiempo real a los registros de jornada en modo solo lectura para la verificación y control del cumplimiento de la legislación laboral.',
                                 style: TextStyle(
@@ -155,6 +176,8 @@ class InspectorHome extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 24),
+
+                              // Panel de opciones en formato cuadrícula.
                               GridView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
@@ -174,6 +197,8 @@ class InspectorHome extends StatelessWidget {
                               ),
                             ],
                           )
+
+                        // Diseño para pantallas pequeñas.
                         : Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -197,6 +222,7 @@ class InspectorHome extends StatelessWidget {
   }
 }
 
+/// Clase auxiliar que representa una opción del panel de inspección.
 class _InspectorItem {
   final String title;
   final String subtitle;
@@ -211,6 +237,7 @@ class _InspectorItem {
   });
 }
 
+/// Tarjeta visual utilizada para mostrar una opción del panel.
 class _InspectorDashboardCard extends StatelessWidget {
   final _InspectorItem item;
 
@@ -232,11 +259,15 @@ class _InspectorDashboardCard extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Row(
             children: [
+              // Icono principal de la opción.
               Container(
                 width: 68,
                 height: 68,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withOpacity(0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
@@ -246,6 +277,8 @@ class _InspectorDashboardCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 18),
+
+              // Título y descripción de la opción.
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -275,6 +308,8 @@ class _InspectorDashboardCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
+
+              // Indicador visual de navegación.
               const Icon(
                 Icons.arrow_forward_ios,
                 size: 18,

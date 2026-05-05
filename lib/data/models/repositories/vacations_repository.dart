@@ -4,17 +4,33 @@ import 'package:flutter/foundation.dart';
 import 'notifications_repository.dart';
 import 'vacation_request.dart';
 
+/// Repositorio encargado de gestionar las solicitudes de vacaciones.
+/// Centraliza el acceso a Firestore y contiene la lógica asociada a:
+/// - creación de solicitudes
+/// - aprobación o rechazo
+/// - cancelación de solicitudes
+/// - envío de notificaciones a trabajadores y administradores
 class VacationsRepository {
+  /// Colección de Firestore donde se almacenan las solicitudes de vacaciones.
   final CollectionReference<Map<String, dynamic>> _col =
       FirebaseFirestore.instance.collection('vacation_requests');
 
+  /// Instancia general de Firestore para acceder a otras colecciones.
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  /// Repositorio utilizado para crear notificaciones internas.
   final NotificationsRepository _notificationsRepo = NotificationsRepository();
 
+  /// Normaliza una fecha eliminando la parte de hora.
+  /// Esto permite comparar y almacenar días completos sin depender
+  /// de la hora exacta seleccionada.
   DateTime _dateOnly(DateTime date) {
     return DateTime(date.year, date.month, date.day);
   }
 
+  /// Ejecuta una tarea asíncrona sin bloquear el flujo principal.
+  /// Se utiliza para enviar notificaciones después de actualizar Firestore,
+  /// evitando que un fallo en la notificación afecte a la operación principal.
   void _runDetached(Future<void> Function() task) {
     Future<void>(() async {
       try {
@@ -26,6 +42,9 @@ class VacationsRepository {
     });
   }
 
+  /// Devuelve en tiempo real todas las solicitudes de vacaciones.
+  /// Las solicitudes se ordenan por fecha de creación, mostrando primero
+  /// las más recientes.
   Stream<List<VacationRequest>> streamAllRequests() {
     return _col.snapshots().map((snap) {
       final items = snap.docs.map(VacationRequest.fromDoc).toList()
@@ -38,6 +57,9 @@ class VacationsRepository {
     });
   }
 
+  /// Devuelve en tiempo real las solicitudes de vacaciones de un empleado.
+  /// Parámetro:
+  /// - employeeId: identificador del empleado.
   Stream<List<VacationRequest>> streamEmployeeRequests(String employeeId) {
     return _col
         .where('employeeId', isEqualTo: employeeId)
@@ -53,6 +75,7 @@ class VacationsRepository {
     });
   }
 
+  /// Obtiene los identificadores de todos los usuarios administradores.
   Future<List<String>> _getAdminUids() async {
     final snap = await _db
         .collection('users')
@@ -62,6 +85,8 @@ class VacationsRepository {
     return snap.docs.map((d) => d.id).toList();
   }
 
+  /// Obtiene el UID del usuario asociado a un empleado concreto.
+  /// Se utiliza para poder notificar al trabajador a partir de su employeeId.
   Future<String?> _getWorkerUidByEmployeeId(String employeeId) async {
     final snap = await _db
         .collection('users')
@@ -73,6 +98,7 @@ class VacationsRepository {
     return snap.docs.first.id;
   }
 
+  /// Envía una notificación a todos los administradores.
   Future<void> _notifyAdmins({
     required String title,
     required String body,
@@ -81,6 +107,7 @@ class VacationsRepository {
     String? relatedType,
   }) async {
     final adminUids = await _getAdminUids();
+
     if (adminUids.isEmpty) {
       debugPrint('No hay admins para notificar.');
       return;
@@ -98,6 +125,7 @@ class VacationsRepository {
     }
   }
 
+  /// Envía una notificación al trabajador correspondiente.
   Future<void> _notifyWorker({
     required String employeeId,
     required String title,
@@ -123,12 +151,16 @@ class VacationsRepository {
     );
   }
 
+  /// Formatea una fecha en formato dd/mm/yyyy.
   String _fmtDate(DateTime d) {
     return '${d.day.toString().padLeft(2, '0')}/'
         '${d.month.toString().padLeft(2, '0')}/'
         '${d.year}';
   }
 
+  /// Crea una nueva solicitud de vacaciones.
+  /// La solicitud se guarda inicialmente con estado 'pending' y se notifica
+  /// a los administradores para su revisión.
   Future<void> createRequest({
     required String employeeId,
     required String employeeName,
@@ -170,6 +202,8 @@ class VacationsRepository {
     }
   }
 
+  /// Aprueba una solicitud de vacaciones.
+  /// Actualiza el estado de la solicitud y notifica al trabajador.
   Future<void> approveRequest(String requestId) async {
     final snap = await _col.doc(requestId).get();
     final data = snap.data();
@@ -203,6 +237,8 @@ class VacationsRepository {
     });
   }
 
+  /// Rechaza una solicitud de vacaciones.
+  /// Guarda el comentario del administrador y notifica al trabajador.
   Future<void> rejectRequest(String requestId, String adminComment) async {
     final snap = await _col.doc(requestId).get();
     final data = snap.data();
@@ -234,6 +270,8 @@ class VacationsRepository {
     });
   }
 
+  /// Cancela directamente una solicitud que todavía está pendiente.
+  /// Solo se permite cancelar solicitudes cuyo estado sea 'pending'.
   Future<void> cancelPendingRequest(String requestId) async {
     final snap = await _col.doc(requestId).get();
     final data = snap.data();
@@ -251,6 +289,9 @@ class VacationsRepository {
     });
   }
 
+  /// Solicita la cancelación de unas vacaciones ya aprobadas.
+  /// Cambia el estado a 'cancel_requested' y notifica a los administradores
+  /// para que aprueben o rechacen la cancelación.
   Future<void> requestCancellation(
     String requestId, {
     String cancelRequestComment = '',
@@ -290,6 +331,8 @@ class VacationsRepository {
     });
   }
 
+  /// Aprueba la cancelación de unas vacaciones.
+  /// La solicitud pasa a estado 'cancelled' y se notifica al trabajador.
   Future<void> approveCancellation(String requestId) async {
     final snap = await _col.doc(requestId).get();
     final data = snap.data();
@@ -321,6 +364,9 @@ class VacationsRepository {
     });
   }
 
+  /// Deniega la cancelación de unas vacaciones.
+  /// La solicitud vuelve al estado 'approved' y se registra el comentario
+  /// del administrador.
   Future<void> denyCancellation(String requestId, String adminComment) async {
     final snap = await _col.doc(requestId).get();
     final data = snap.data();

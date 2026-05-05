@@ -1,37 +1,35 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Repositorio encargado de la gestión de empleados en Firestore.
+/// Centraliza todas las operaciones relacionadas con la colección 'employees',
+/// incluyendo consultas en tiempo real, creación, actualización y eliminación.
+
 class EmployeesRepository {
+
+  /// Referencia a la colección 'employees' en Firestore.
   final _col = FirebaseFirestore.instance.collection('employees');
 
+  /// Devuelve un flujo en tiempo real con la lista de empleados.
+  /// Los resultados se ordenan por fecha de creación descendente,
+  /// mostrando primero los más recientes.
   Stream<QuerySnapshot<Map<String, dynamic>>> streamEmployees() {
     return _col.orderBy('createdAt', descending: true).snapshots();
   }
 
+  /// Devuelve un flujo en tiempo real de un empleado concreto por su ID.
+  /// Parámetro:
+  /// - id: identificador del documento en Firestore
   Stream<DocumentSnapshot<Map<String, dynamic>>> streamEmployeeById(String id) {
     return _col.doc(id).snapshots();
   }
 
+  /// Añade un nuevo empleado a la colección.
   Future<void> addEmployee({
-    required String dni,
     required String name,
     required String department,
   }) async {
-    final cleanDni = dni.trim();
-
-    if (cleanDni.isNotEmpty) {
-      final existing = await _col
-          .where('dni', isEqualTo: cleanDni)
-          .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 6));
-
-      if (existing.docs.isNotEmpty) {
-        throw Exception('Ya existe un empleado con ese DNI');
-      }
-    }
-
+    // Creación del nuevo documento en Firestore
     await _col.add({
-      'dni': cleanDni,
       'name': name.trim(),
       'department': department.trim(),
       'active': true,
@@ -39,35 +37,23 @@ class EmployeesRepository {
     });
   }
 
+  /// Actualiza los datos de un empleado existente.
   Future<void> updateEmployee(
     String id, {
-    required String dni,
     required String name,
     required String department,
     required bool active,
   }) async {
-    final cleanDni = dni.trim();
-
-    if (cleanDni.isNotEmpty) {
-      final existing = await _col
-          .where('dni', isEqualTo: cleanDni)
-          .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 6));
-
-      if (existing.docs.isNotEmpty && existing.docs.first.id != id) {
-        throw Exception('Ya existe otro empleado con ese DNI');
-      }
-    }
-
     await _col.doc(id).update({
-      'dni': cleanDni,
       'name': name.trim(),
       'department': department.trim(),
       'active': active,
     });
   }
 
+  /// Elimina un empleado de la base de datos.
+  /// Parámetro:
+  /// - id: identificador del documento a eliminar
   Future<void> deleteEmployee(String id) async {
     await _col.doc(id).delete();
   }

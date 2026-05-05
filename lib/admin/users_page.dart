@@ -234,14 +234,12 @@ class _EmployeeFormDialogState extends State<EmployeeFormDialog> {
       if (isEdit) {
         await widget.repo.updateEmployee(
           widget.id!,
-          dni: '',
           name: nameVal,
           department: depVal,
           active: isActive,
         );
       } else {
         await widget.repo.addEmployee(
-          dni: '',
           name: nameVal,
           department: depVal,
         );

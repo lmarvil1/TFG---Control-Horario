@@ -1,19 +1,46 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Modelo que representa una solicitud de vacaciones.
+/// Contiene la información necesaria para gestionar el ciclo completo
+/// de una solicitud: creación, aprobación, rechazo y posible cancelación.
 class VacationRequest {
+  /// Identificador del documento en Firestore.
   final String id;
+
+  /// Identificador del empleado que realiza la solicitud.
   final String employeeId;
+
+  /// Nombre del empleado.
   final String employeeName;
+
+  /// Fecha de inicio de las vacaciones.
   final DateTime startDate;
+
+  /// Fecha de fin de las vacaciones.
   final DateTime endDate;
+
+  /// Número total de días solicitados.
   final int days;
+
+  /// Estado actual de la solicitud (pending, approved, rejected, cancelled.
   final String status;
+
+  /// Comentario añadido por el trabajador.
   final String workerComment;
+
+  /// Comentario añadido por el administrador.
   final String adminComment;
+
+  /// Fecha de creación de la solicitud.
   final DateTime? createdAt;
 
+  /// Comentario introducido al solicitar la cancelación.
   final String cancelRequestComment;
+
+  /// Fecha en la que se solicita la cancelación.
   final DateTime? cancelRequestedAt;
+
+  /// Fecha en la que se resuelve la cancelación.
   final DateTime? cancelResolvedAt;
 
   VacationRequest({
@@ -32,10 +59,15 @@ class VacationRequest {
     required this.cancelResolvedAt,
   });
 
+  /// Normaliza una fecha eliminando la parte de hora.
+  /// Esto evita inconsistencias al comparar o almacenar días completos.
   static DateTime _dateOnly(DateTime date) {
     return DateTime(date.year, date.month, date.day);
   }
 
+  /// Crea una copia del objeto modificando solo los campos indicados.
+  /// Este método resulta útil para actualizar datos sin alterar
+  /// directamente la instancia original.
   VacationRequest copyWith({
     String? id,
     String? employeeId,
@@ -68,6 +100,8 @@ class VacationRequest {
     );
   }
 
+  /// Convierte el objeto VacationRequest en un mapa compatible con Firestore.
+  /// Se utiliza al guardar o actualizar solicitudes en la base de datos.
   Map<String, dynamic> toMap() {
     return {
       'employeeId': employeeId,
@@ -91,6 +125,9 @@ class VacationRequest {
     };
   }
 
+  /// Crea una instancia de VacationRequest a partir de un documento Firestore.
+  /// Incluye conversiones seguras para evitar errores si algún campo
+  /// no existe o llega con un formato inesperado.
   factory VacationRequest.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
 
@@ -100,6 +137,8 @@ class VacationRequest {
     final cancelRequestedTs = data['cancelRequestedAt'];
     final cancelResolvedTs = data['cancelResolvedAt'];
 
+    // Conversión de fechas desde Timestamp de Firestore.
+    // Si no existe una fecha válida, se utiliza la fecha actual como respaldo.
     final startDateRaw =
         startTs is Timestamp ? startTs.toDate() : DateTime.now();
     final endDateRaw =
