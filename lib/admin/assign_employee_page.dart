@@ -377,13 +377,11 @@ class _AssignEmployeePageState extends State<AssignEmployeePage> {
                                 ),
                                 items: docs.map((d) {
                                   final data = d.data();
-                                  final dni = (data['dni'] ?? '') as String;
                                   final name = (data['name'] ?? '') as String;
                                   final dep =
                                       (data['department'] ?? '') as String;
 
                                   final label =
-                                      '$name${dni.isEmpty ? "" : " ($dni)"}'
                                       '${dep.isEmpty ? "" : " - $dep"}';
 
                                   return DropdownMenuItem<String>(

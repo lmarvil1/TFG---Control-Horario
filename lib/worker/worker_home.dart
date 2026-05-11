@@ -10,10 +10,10 @@ import '../data/models/repositories/punches_repository.dart';
 import '../notifications/notifications_page.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/connectivity_service.dart';
+import 'justifications_page.dart';
 import 'punches_history_page.dart';
 import 'worker_payrolls_page.dart';
 import 'worker_requests_page.dart';
-import 'worker_vacations_page.dart';
 
 class WorkerHome extends StatefulWidget {
   final bool launchedFromAdmin;
@@ -69,9 +69,7 @@ class _WorkerHomeState extends State<WorkerHome> {
         );
         await Future.delayed(const Duration(milliseconds: 2300));
       }
-    } catch (_) {
-      // No bloqueamos la pantalla si falla esto.
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadCachedEmployeeId() async {
@@ -159,9 +157,7 @@ class _WorkerHomeState extends State<WorkerHome> {
               ? 'Volver al panel admin'
               : 'Cerrar sesión',
           icon: Icon(
-            widget.launchedFromAdmin
-                ? Icons.switch_account
-                : Icons.logout,
+            widget.launchedFromAdmin ? Icons.switch_account : Icons.logout,
           ),
           onPressed: () async {
             if (widget.launchedFromAdmin) {
@@ -178,10 +174,8 @@ class _WorkerHomeState extends State<WorkerHome> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
-    final userDocStream = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .snapshots();
+    final userDocStream =
+        FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots();
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: userDocStream,
@@ -241,7 +235,9 @@ class _WorkerHomeState extends State<WorkerHome> {
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
                     child: Center(
                       child: _PunchButtons(employeeId: empId),
                     ),
@@ -251,7 +247,6 @@ class _WorkerHomeState extends State<WorkerHome> {
             ),
           ),
           PunchesHistoryPage(employeeId: empId),
-          WorkerRequestsPage(employeeId: empId),
           StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
                 .collection('employees')
@@ -264,11 +259,15 @@ class _WorkerHomeState extends State<WorkerHome> {
                       ? displayName
                       : (empData?['name'] ?? displayName).toString().trim();
 
-              return WorkerVacationsPage(
+              return WorkerRequestsPage(
                 employeeId: empId,
                 employeeName: employeeName,
               );
             },
+          ),
+          JustificationsPage(
+            employeeId: empId,
+            showAppBar: false,
           ),
           WorkerPayrollsPage(employeeId: empId),
         ];
@@ -300,8 +299,8 @@ class _WorkerHomeState extends State<WorkerHome> {
                 label: 'Solicitudes',
               ),
               NavigationDestination(
-                icon: Icon(Icons.beach_access),
-                label: 'Vacaciones',
+                icon: Icon(Icons.attach_file),
+                label: 'Justificantes',
               ),
               NavigationDestination(
                 icon: Icon(Icons.receipt_long),

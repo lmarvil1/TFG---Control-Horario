@@ -89,13 +89,39 @@ class _IncidentCreatePageState extends State<IncidentCreatePage> {
     try {
       final user = FirebaseAuth.instance.currentUser!;
 
-      final proposedDateTime = DateTime(
+      final now = DateTime.now();
+
+      final selectedDateOnly = DateTime(
         selectedDate.year,
         selectedDate.month,
         selectedDate.day,
+      );
+
+      final todayOnly = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      );
+
+      final proposedDateTime = DateTime(
+        selectedDateOnly.year,
+        selectedDateOnly.month,
+        selectedDateOnly.day,
         selectedTime.hour,
         selectedTime.minute,
       );
+
+      if (selectedDateOnly.isAfter(todayOnly) || proposedDateTime.isAfter(now)) {
+        if (!mounted) return;
+
+        _snack(
+          'No puedes crear incidencias con fecha u hora futura',
+          isError: true,
+        );
+
+        setState(() => loading = false);
+        return;
+      }
 
       final employeeName = await _loadEmployeeName(widget.employeeId);
 

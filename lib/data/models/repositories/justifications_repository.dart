@@ -20,10 +20,6 @@ class JustificationsRepository {
       _db.collection('absence_justifications');
 
   /// Devuelve un flujo en tiempo real con los justificantes del usuario.
-  /// Parámetro:
-  /// - uid: identificador del usuario autenticado
-  
-  /// Los resultados se ordenan por fecha de creación descendente.
   Stream<QuerySnapshot<Map<String, dynamic>>> streamMine(String uid) {
     return _col
         .where('uid', isEqualTo: uid)
@@ -32,11 +28,6 @@ class JustificationsRepository {
   }
 
   /// Sube un justificante de ausencia.
-  /// Proceso:
-  /// 1. Genera un nombre seguro para el archivo
-  /// 2. Sube el archivo a Firebase Storage
-  /// 3. Obtiene la URL de descarga
-  /// 4. Guarda los metadatos en Firestore
   Future<void> uploadJustification({
     required String uid,
     required String employeeId,
@@ -48,25 +39,44 @@ class JustificationsRepository {
   }) async {
     final now = DateTime.now();
 
-    // Limpia el nombre del archivo para evitar caracteres no válidos
+    // BLOQUEAR FECHAS FUTURAS
+    final selectedDateOnly = DateTime(
+      date.year,
+      date.month,
+      date.day,
+    );
+
+    final todayOnly = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    );
+
+    if (selectedDateOnly.isAfter(todayOnly)) {
+      throw Exception(
+        'No se pueden subir justificantes de fechas futuras',
+      );
+    }
+
+    // Limpia el nombre del archivo
     final safeName = filename.replaceAll(RegExp(r'[^\w\.\-]'), '_');
 
-    // Ruta donde se almacenará el archivo en Firebase Storage
+    // Ruta del archivo
     final path =
         'justifications/$uid/${now.millisecondsSinceEpoch}_$safeName';
 
     final storageRef = _storage.ref().child(path);
 
-    // Subida del archivo con su tipo de contenido
+    // Subida del archivo
     await storageRef.putData(
       bytes,
       SettableMetadata(contentType: contentType),
     );
 
-    // Obtención de la URL de descarga
+    // URL descarga
     final downloadUrl = await storageRef.getDownloadURL();
 
-    // Registro del justificante en Firestore
+    // Registro en Firestore
     await _col.add({
       'uid': uid,
       'employeeId': employeeId,
@@ -76,7 +86,7 @@ class JustificationsRepository {
       'contentType': contentType,
       'reason': reason.trim(),
 
-      // Se guarda solo la fecha (sin hora)
+      // Solo fecha
       'date': Timestamp.fromDate(
         DateTime(date.year, date.month, date.day),
       ),

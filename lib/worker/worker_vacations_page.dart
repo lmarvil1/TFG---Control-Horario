@@ -847,8 +847,14 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
         adminComment.isNotEmpty &&
         r.cancelResolvedAt != null;
 
-    final canCancelPending = r.status == 'pending';
-    final canRequestCancellation = r.status == 'approved';
+    final today = _dateOnly(DateTime.now());
+    final canCancelPending =
+        r.status == 'pending' &&
+        !_dateOnly(r.startDate).isBefore(today);
+
+    final canRequestCancellation =
+      r.status == 'approved' &&
+      !_dateOnly(r.startDate).isBefore(today);
 
     return Card(
       child: Padding(
@@ -1153,6 +1159,9 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                 }
 
                 return Scaffold(
+                  appBar: AppBar(
+                    title: const Text('Vacaciones'),
+                  ),
                   body: SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.all(12),

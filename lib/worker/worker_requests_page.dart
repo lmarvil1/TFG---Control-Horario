@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
-import 'justifications_page.dart';
-import 'worker_create_incident_page.dart';
 import 'worker_incidents_page.dart';
+import 'worker_vacations_page.dart';
 
 class WorkerRequestsPage extends StatelessWidget {
   final String employeeId;
+  final String employeeName;
 
   const WorkerRequestsPage({
     super.key,
     required this.employeeId,
+    required this.employeeName,
   });
 
   @override
@@ -27,50 +28,41 @@ class WorkerRequestsPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Gestiona tus incidencias y justificantes desde este apartado.',
+            'Gestiona tus incidencias y vacaciones desde este apartado.',
             style: TextStyle(
               fontSize: 15,
               color: Colors.black54,
             ),
           ),
           const SizedBox(height: 20),
+
           _RequestCard(
             icon: Icons.warning_amber_rounded,
-            title: 'Mis incidencias',
-            subtitle: 'Consulta las incidencias enviadas y revisa su estado.',
+            title: 'Incidencias',
+            subtitle: 'Consulta tus incidencias y crea nuevas desde el botón +.',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => const WorkerIncidentsPage(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 14),
-          _RequestCard(
-            icon: Icons.add_circle_outline,
-            title: 'Nueva incidencia',
-            subtitle: 'Crea una nueva solicitud por olvido de fichaje.',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => WorkerCreateIncidentPage(
+                  builder: (_) => WorkerIncidentsPage(
                     employeeId: employeeId,
                   ),
                 ),
               );
             },
           ),
+
           const SizedBox(height: 14),
+
           _RequestCard(
-            icon: Icons.attach_file,
-            title: 'Justificantes',
-            subtitle: 'Sube documentos o imágenes justificativas.',
+            icon: Icons.beach_access,
+            title: 'Vacaciones',
+            subtitle: 'Solicita vacaciones y revisa su estado.',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => JustificationsPage(
+                  builder: (_) => WorkerVacationsPage(
                     employeeId: employeeId,
+                    employeeName: employeeName,
                   ),
                 ),
               );
@@ -113,7 +105,8 @@ class _RequestCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                  color:
+                      Theme.of(context).colorScheme.primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(

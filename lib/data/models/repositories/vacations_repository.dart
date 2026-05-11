@@ -22,15 +22,11 @@ class VacationsRepository {
   final NotificationsRepository _notificationsRepo = NotificationsRepository();
 
   /// Normaliza una fecha eliminando la parte de hora.
-  /// Esto permite comparar y almacenar días completos sin depender
-  /// de la hora exacta seleccionada.
   DateTime _dateOnly(DateTime date) {
     return DateTime(date.year, date.month, date.day);
   }
 
   /// Ejecuta una tarea asíncrona sin bloquear el flujo principal.
-  /// Se utiliza para enviar notificaciones después de actualizar Firestore,
-  /// evitando que un fallo en la notificación afecte a la operación principal.
   void _runDetached(Future<void> Function() task) {
     Future<void>(() async {
       try {
@@ -42,9 +38,6 @@ class VacationsRepository {
     });
   }
 
-  /// Devuelve en tiempo real todas las solicitudes de vacaciones.
-  /// Las solicitudes se ordenan por fecha de creación, mostrando primero
-  /// las más recientes.
   Stream<List<VacationRequest>> streamAllRequests() {
     return _col.snapshots().map((snap) {
       final items = snap.docs.map(VacationRequest.fromDoc).toList()
@@ -57,9 +50,6 @@ class VacationsRepository {
     });
   }
 
-  /// Devuelve en tiempo real las solicitudes de vacaciones de un empleado.
-  /// Parámetro:
-  /// - employeeId: identificador del empleado.
   Stream<List<VacationRequest>> streamEmployeeRequests(String employeeId) {
     return _col
         .where('employeeId', isEqualTo: employeeId)
@@ -75,7 +65,6 @@ class VacationsRepository {
     });
   }
 
-  /// Obtiene los identificadores de todos los usuarios administradores.
   Future<List<String>> _getAdminUids() async {
     final snap = await _db
         .collection('users')
@@ -85,8 +74,6 @@ class VacationsRepository {
     return snap.docs.map((d) => d.id).toList();
   }
 
-  /// Obtiene el UID del usuario asociado a un empleado concreto.
-  /// Se utiliza para poder notificar al trabajador a partir de su employeeId.
   Future<String?> _getWorkerUidByEmployeeId(String employeeId) async {
     final snap = await _db
         .collection('users')
@@ -98,7 +85,6 @@ class VacationsRepository {
     return snap.docs.first.id;
   }
 
-  /// Envía una notificación a todos los administradores.
   Future<void> _notifyAdmins({
     required String title,
     required String body,
@@ -125,7 +111,6 @@ class VacationsRepository {
     }
   }
 
-  /// Envía una notificación al trabajador correspondiente.
   Future<void> _notifyWorker({
     required String employeeId,
     required String title,
@@ -151,16 +136,12 @@ class VacationsRepository {
     );
   }
 
-  /// Formatea una fecha en formato dd/mm/yyyy.
   String _fmtDate(DateTime d) {
     return '${d.day.toString().padLeft(2, '0')}/'
         '${d.month.toString().padLeft(2, '0')}/'
         '${d.year}';
   }
 
-  /// Crea una nueva solicitud de vacaciones.
-  /// La solicitud se guarda inicialmente con estado 'pending' y se notifica
-  /// a los administradores para su revisión.
   Future<void> createRequest({
     required String employeeId,
     required String employeeName,
@@ -171,6 +152,15 @@ class VacationsRepository {
   }) async {
     final normalizedStart = _dateOnly(startDate);
     final normalizedEnd = _dateOnly(endDate);
+    final today = _dateOnly(DateTime.now());
+
+    if (normalizedStart.isBefore(today) || normalizedEnd.isBefore(today)) {
+      throw Exception('No se pueden solicitar vacaciones en fechas pasadas');
+    }
+
+    if (normalizedEnd.isBefore(normalizedStart)) {
+      throw Exception('La fecha de fin no puede ser anterior a la fecha de inicio');
+    }
 
     final docRef = await _col.add({
       'employeeId': employeeId.trim(),
@@ -202,8 +192,6 @@ class VacationsRepository {
     }
   }
 
-  /// Aprueba una solicitud de vacaciones.
-  /// Actualiza el estado de la solicitud y notifica al trabajador.
   Future<void> approveRequest(String requestId) async {
     final snap = await _col.doc(requestId).get();
     final data = snap.data();
@@ -237,8 +225,6 @@ class VacationsRepository {
     });
   }
 
-  /// Rechaza una solicitud de vacaciones.
-  /// Guarda el comentario del administrador y notifica al trabajador.
   Future<void> rejectRequest(String requestId, String adminComment) async {
     final snap = await _col.doc(requestId).get();
     final data = snap.data();
@@ -270,17 +256,26 @@ class VacationsRepository {
     });
   }
 
-  /// Cancela directamente una solicitud que todavía está pendiente.
-  /// Solo se permite cancelar solicitudes cuyo estado sea 'pending'.
   Future<void> cancelPendingRequest(String requestId) async {
     final snap = await _col.doc(requestId).get();
     final data = snap.data();
     if (data == null) return;
 
     final status = (data['status'] as String?)?.trim() ?? '';
+    final startTs = data['startDate'] as Timestamp?;
+    final start = startTs?.toDate();
 
     if (status != 'pending') {
       throw Exception('Solo se pueden cancelar solicitudes pendientes');
+    }
+
+    if (start != null) {
+      final today = _dateOnly(DateTime.now());
+      final startDateOnly = _dateOnly(start);
+
+      if (startDateOnly.isBefore(today)) {
+        throw Exception('No se pueden cancelar vacaciones que ya han pasado');
+      }
     }
 
     await _col.doc(requestId).update({
@@ -289,9 +284,6 @@ class VacationsRepository {
     });
   }
 
-  /// Solicita la cancelación de unas vacaciones ya aprobadas.
-  /// Cambia el estado a 'cancel_requested' y notifica a los administradores
-  /// para que aprueben o rechacen la cancelación.
   Future<void> requestCancellation(
     String requestId, {
     String cancelRequestComment = '',
@@ -300,12 +292,26 @@ class VacationsRepository {
     final data = snap.data();
     if (data == null) return;
 
+    final status = (data['status'] as String?)?.trim() ?? '';
     final employeeName =
         (data['employeeName'] as String?)?.trim() ?? 'Un trabajador';
     final startTs = data['startDate'] as Timestamp?;
     final endTs = data['endDate'] as Timestamp?;
     final start = startTs?.toDate();
     final end = endTs?.toDate();
+
+    if (status != 'approved') {
+      throw Exception('Solo se puede solicitar la cancelación de vacaciones aprobadas');
+    }
+
+    if (start != null) {
+      final today = _dateOnly(DateTime.now());
+      final startDateOnly = _dateOnly(start);
+
+      if (startDateOnly.isBefore(today)) {
+        throw Exception('No se pueden cancelar vacaciones que ya han pasado');
+      }
+    }
 
     await _col.doc(requestId).update({
       'status': 'cancel_requested',
@@ -331,8 +337,6 @@ class VacationsRepository {
     });
   }
 
-  /// Aprueba la cancelación de unas vacaciones.
-  /// La solicitud pasa a estado 'cancelled' y se notifica al trabajador.
   Future<void> approveCancellation(String requestId) async {
     final snap = await _col.doc(requestId).get();
     final data = snap.data();
@@ -343,6 +347,15 @@ class VacationsRepository {
     final endTs = data['endDate'] as Timestamp?;
     final start = startTs?.toDate();
     final end = endTs?.toDate();
+
+    if (start != null) {
+      final today = _dateOnly(DateTime.now());
+      final startDateOnly = _dateOnly(start);
+
+      if (startDateOnly.isBefore(today)) {
+        throw Exception('No se pueden cancelar vacaciones que ya han pasado');
+      }
+    }
 
     await _col.doc(requestId).update({
       'status': 'cancelled',
@@ -364,9 +377,6 @@ class VacationsRepository {
     });
   }
 
-  /// Deniega la cancelación de unas vacaciones.
-  /// La solicitud vuelve al estado 'approved' y se registra el comentario
-  /// del administrador.
   Future<void> denyCancellation(String requestId, String adminComment) async {
     final snap = await _col.doc(requestId).get();
     final data = snap.data();

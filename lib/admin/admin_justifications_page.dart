@@ -20,7 +20,8 @@ class AdminJustificationsPage extends StatefulWidget {
   });
 
   @override
-  State<AdminJustificationsPage> createState() => _AdminJustificationsPageState();
+  State<AdminJustificationsPage> createState() =>
+      _AdminJustificationsPageState();
 }
 
 class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
@@ -99,7 +100,7 @@ class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.readOnly ? 'Justificantes' : 'Justificantes'),
+        title: const Text('Justificantes'),
       ),
       body: SafeArea(
         child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -127,12 +128,11 @@ class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
               for (final d in empDocs)
                 d.id: {
                   'name': (d.data()['name'] ?? '').toString(),
-                  'dni': (d.data()['dni'] ?? '').toString(),
                 }
             };
 
-            Query<Map<String, dynamic>> q = FirebaseFirestore.instance
-                .collection('absence_justifications');
+            Query<Map<String, dynamic>> q =
+                FirebaseFirestore.instance.collection('absence_justifications');
 
             if (selectedEmployeeId != null && selectedEmployeeId!.isNotEmpty) {
               q = q.where('employeeId', isEqualTo: selectedEmployeeId);
@@ -181,7 +181,7 @@ class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
                                     controller: searchCtrl,
                                     decoration: const InputDecoration(
                                       labelText:
-                                          'Buscar (nombre, DNI, motivo, archivo)',
+                                          'Buscar (nombre, motivo, archivo)',
                                       border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.search),
                                     ),
@@ -208,15 +208,11 @@ class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
                                         final e = d.data();
                                         final name =
                                             (e['name'] ?? '').toString();
-                                        final dni = (e['dni'] ?? '').toString();
-                                        final label = dni.isNotEmpty
-                                            ? '$name ($dni)'
-                                            : name;
 
                                         return DropdownMenuItem<String?>(
                                           value: d.id,
                                           child: Text(
-                                            label,
+                                            name,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -320,10 +316,9 @@ class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
 
                           final emp = empMap[employeeId];
                           final empName = emp?['name'] ?? '';
-                          final empDni = emp?['dni'] ?? '';
 
                           final haystack =
-                              '$empName $empDni $reason $filename'.toLowerCase();
+                              '$empName $reason $filename'.toLowerCase();
 
                           return haystack.contains(queryText);
                         }).toList();
@@ -376,9 +371,7 @@ class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
 
                             return ListTile(
                               leading: Icon(
-                                isPdf
-                                    ? Icons.picture_as_pdf
-                                    : Icons.image,
+                                isPdf ? Icons.picture_as_pdf : Icons.image,
                               ),
                               title: Text(
                                 titleText,
@@ -413,8 +406,7 @@ class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
                                         return;
                                       }
 
-                                      final path =
-                                          await _downloadToAppFolder(
+                                      final path = await _downloadToAppFolder(
                                         url: url,
                                         filename: filename.isNotEmpty
                                             ? filename
