@@ -381,8 +381,7 @@ class _AssignEmployeePageState extends State<AssignEmployeePage> {
                                   final dep =
                                       (data['department'] ?? '') as String;
 
-                                  final label =
-                                      '${dep.isEmpty ? "" : " - $dep"}';
+                                  final label = dep.isEmpty ? name : '$name - $dep';
 
                                   return DropdownMenuItem<String>(
                                     value: d.id,

@@ -36,6 +36,8 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
   List<_PunchItem> allPunches = [];
   List<_PunchItem> currentFiltered = [];
 
+  static const int ordinaryDailyMinutes = 480; // 8 horas
+
   List<Map<String, dynamic>> get _currentFilteredData =>
       currentFiltered.map((e) => e.data).toList();
 
@@ -119,6 +121,18 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
       }
     }
     return minutes;
+  }
+
+  int _ordinaryMinutes(int workedMinutes) {
+    if (workedMinutes <= 0) return 0;
+    return workedMinutes > ordinaryDailyMinutes
+        ? ordinaryDailyMinutes
+        : workedMinutes;
+  }
+
+  int _extraMinutes(int workedMinutes) {
+    if (workedMinutes <= ordinaryDailyMinutes) return 0;
+    return workedMinutes - ordinaryDailyMinutes;
   }
 
   String _formatMinutes(int minutes) {
@@ -408,6 +422,20 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                           totalMinutes = _workedMinutes(ascCalcData);
                         }
 
+                        final totalOrdinaryMinutes = mode == 0
+                            ? _ordinaryMinutes(totalMinutes)
+                            : perDayMinutes.values.fold<int>(
+                                0,
+                                (sum, day) => sum + _ordinaryMinutes(day),
+                              );
+
+                        final totalExtraMinutes = mode == 0
+                            ? _extraMinutes(totalMinutes)
+                            : perDayMinutes.values.fold<int>(
+                                0,
+                                (sum, day) => sum + _extraMinutes(day),
+                              );
+
                         final sortedEntries = perDayMinutes.entries.toList()
                           ..sort((a, b) => b.key.compareTo(a.key));
 
@@ -415,54 +443,110 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                           padding: const EdgeInsets.all(12),
                           children: [
                             Card(
-                              child: ListTile(
-                                leading: const Icon(Icons.schedule),
-                                title: Text(
-                                  'Total trabajado (${mode == 0 ? "día" : "mes"})',
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
                                 ),
-                                subtitle: Text(_formatMinutes(totalMinutes)),
-                              ),
-                            ),
-                            if (mode == 1) ...[
-                              const SizedBox(height: 10),
-                              Card(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Totales diarios del mes',
-                                        style: TextStyle(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Total trabajado (${mode == 0 ? "día" : "mes"})',
+                                      style:
+                                          Theme.of(context).textTheme.titleMedium,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      _formatMinutes(totalMinutes),
+                                      style:
+                                          Theme.of(context).textTheme.bodyLarge,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Ordinarias: ${_formatMinutes(totalOrdinaryMinutes)}',
+                                    ),
+                                    if (totalExtraMinutes > 0) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Extras: ${_formatMinutes(totalExtraMinutes)}',
+                                        style: const TextStyle(
+                                          color: Colors.orange,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
-                                      const SizedBox(height: 8),
-                                      if (sortedEntries.isEmpty)
-                                        const Text(
-                                          'No hay fichajes en este mes.',
-                                        )
-                                      else
-                                        ...sortedEntries.map(
-                                          (e) => Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 4,
-                                            ),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Text(dfDay.format(e.key)),
-                                                Text(_formatMinutes(e.value)),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
                                     ],
-                                  ),
+                                  ],
                                 ),
                               ),
+                            ),
+                            if (mode == 1) ...[
+                              const SizedBox(height: 14),
+                              const Text(
+                                'Resumen diario',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              if (sortedEntries.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  child: Text('No hay fichajes en este mes.'),
+                                )
+                              else
+                                ...sortedEntries.map((e) {
+                                  final ordinary = _ordinaryMinutes(e.value);
+                                  final extra = _extraMinutes(e.value);
+
+                                  return Card(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.today),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  dfDay.format(e.key),
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Total trabajado: ${_formatMinutes(e.value)}',
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Ordinarias: ${_formatMinutes(ordinary)}',
+                                          ),
+                                          if (extra > 0) ...[
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Extras: ${_formatMinutes(extra)}',
+                                              style: const TextStyle(
+                                                color: Colors.orange,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }),
                             ],
                             const SizedBox(height: 10),
                             const Text(

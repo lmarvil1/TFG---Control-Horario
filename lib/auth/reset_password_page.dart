@@ -62,7 +62,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
       // Mensaje de confirmación al usuario
       setState(() {
-        _msg = 'Email enviado correctamente';
+        _msg = 'Email enviado correctamente. Revisa también la carpeta de spam o correo no deseado.';
       });
 
     } on FirebaseAuthException catch (e) {
@@ -141,7 +141,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             if (_msg != null)
               Text(
                 _msg!,
-                style: const TextStyle(color: Colors.green),
+                style: const TextStyle(
+                  color: Colors.green,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
 
             // Mensaje de error

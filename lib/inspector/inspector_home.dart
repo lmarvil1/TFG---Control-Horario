@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -7,21 +8,100 @@ import '../admin/admin_vacations_page.dart';
 import '../admin/employee_punches_page.dart';
 import '../admin/users_page.dart';
 
-/// Pantalla principal del rol de Inspección de Trabajo.
-/// Ofrece acceso en modo consulta a la información relevante para
-/// la verificación de registros laborales, sin permitir modificaciones.
 class InspectorHome extends StatelessWidget {
   const InspectorHome({super.key});
 
-  /// Cierra la sesión del usuario autenticado.
+  Future<void> _signOut() async {
+    await FirebaseAuth.instance.signOut();
+  }
+
+  bool _hasActiveInspectionAccess(Map<String, dynamic>? data) {
+    final enabled = data?['inspectionAccessEnabled'] as bool? ?? false;
+    final until = data?['inspectionAccessUntil'];
+
+    if (!enabled) return false;
+
+    if (until == null) return true;
+
+    if (until is Timestamp) {
+      return until.toDate().isAfter(DateTime.now());
+    }
+
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Sesión cerrada')),
+        body: const Center(
+          child: Text('No hay ningún usuario autenticado.'),
+        ),
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final data = snap.data?.data();
+        final hasAccess = _hasActiveInspectionAccess(data);
+
+        if (!hasAccess) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Inspección - Acceso denegado'),
+              actions: [
+                IconButton(
+                  tooltip: 'Cerrar sesión',
+                  icon: const Icon(Icons.logout),
+                  onPressed: _signOut,
+                ),
+              ],
+            ),
+            body: const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Tu acceso ha caducado.\n\n'
+                  'Pide a un administrador que reactive el acceso.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return const _InspectorPanel();
+      },
+    );
+  }
+}
+
+class _InspectorPanel extends StatelessWidget {
+  const _InspectorPanel();
+
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
   }
 
   @override
   Widget build(BuildContext context) {
-    /// Opciones disponibles en el panel de inspección.
-    /// Cada elemento define el texto, icono y navegación correspondiente.
     final items = [
       _InspectorItem(
         title: 'Ver empleados',
@@ -92,7 +172,10 @@ class InspectorHome extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inspección de Trabajo'),
+        title: const Text(
+          'Inspección',
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           IconButton(
             tooltip: 'Cerrar sesión',
@@ -104,7 +187,6 @@ class InspectorHome extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // Adaptación del diseño según el ancho disponible.
             final isWide = constraints.maxWidth >= 900;
             final horizontalPadding = isWide ? 24.0 : 16.0;
             final maxContentWidth = isWide ? 1100.0 : 620.0;
@@ -113,104 +195,91 @@ class InspectorHome extends StatelessWidget {
               padding: EdgeInsets.all(horizontalPadding),
               child: Center(
                 child: ConstrainedBox(
-                  constraints:
-                      BoxConstraints(minHeight: constraints.maxHeight - 32),
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 32,
+                  ),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: isWide
-                        // Diseño para pantallas grandes.
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 8),
+                        Text(
+                          'Panel de inspección',
+                          style: TextStyle(
+                            fontSize: isWide ? 28 : 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.orange.withOpacity(0.4),
+                            ),
+                          ),
+                          child: const Row(
                             children: [
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Panel de inspección',
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Icon(
+                                Icons.visibility,
+                                size: 18,
+                                color: Colors.orange,
                               ),
-                              const SizedBox(height: 8),
-
-                              // Aviso visual de que el acceso es solo de consulta.
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.orange.withOpacity(0.4),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Acceso en modo consulta.',
+                                  style: TextStyle(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                ),
-                                child: const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.visibility,
-                                      size: 18,
-                                      color: Colors.orange,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Acceso en modo consulta.',
-                                        style: TextStyle(
-                                          color: Colors.orange,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-
-                              // Texto descriptivo del alcance funcional del rol.
-                              const Text(
-                                'Inspección de Trabajo tiene acceso remoto y en tiempo real a los registros de jornada en modo solo lectura para la verificación y control del cumplimiento de la legislación laboral.',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-
-                              // Panel de opciones en formato cuadrícula.
-                              GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: items.length,
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 18,
-                                  mainAxisSpacing: 18,
-                                  childAspectRatio: 1.9,
-                                ),
-                                itemBuilder: (context, index) {
-                                  return _InspectorDashboardCard(
-                                    item: items[index],
-                                  );
-                                },
-                              ),
-                            ],
-                          )
-
-                        // Diseño para pantallas pequeñas.
-                        : Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const SizedBox(height: 4),
-                              ...items.map(
-                                (item) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 14),
-                                  child: _InspectorDashboardCard(item: item),
                                 ),
                               ),
                             ],
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Inspección de Trabajo tiene acceso remoto y en tiempo real a los registros de jornada en modo solo lectura para la verificación y control del cumplimiento de la legislación laboral.',
+                          style: TextStyle(
+                            fontSize: isWide ? 15 : 14,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        if (isWide)
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: items.length,
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 18,
+                              mainAxisSpacing: 18,
+                              childAspectRatio: 1.9,
+                            ),
+                            itemBuilder: (context, index) {
+                              return _InspectorDashboardCard(
+                                item: items[index],
+                              );
+                            },
+                          )
+                        else
+                          ...items.map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _InspectorDashboardCard(item: item),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -222,7 +291,6 @@ class InspectorHome extends StatelessWidget {
   }
 }
 
-/// Clase auxiliar que representa una opción del panel de inspección.
 class _InspectorItem {
   final String title;
   final String subtitle;
@@ -237,7 +305,6 @@ class _InspectorItem {
   });
 }
 
-/// Tarjeta visual utilizada para mostrar una opción del panel.
 class _InspectorDashboardCard extends StatelessWidget {
   final _InspectorItem item;
 
@@ -256,29 +323,23 @@ class _InspectorDashboardCard extends StatelessWidget {
       child: InkWell(
         onTap: item.onTap,
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              // Icono principal de la opción.
               Container(
-                width: 68,
-                height: 68,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(16),
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   item.icon,
-                  size: 34,
+                  size: 26,
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
-              const SizedBox(width: 18),
-
-              // Título y descripción de la opción.
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -289,30 +350,28 @@ class _InspectorDashboardCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 19,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       item.subtitle,
-                      maxLines: 3,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         color: Colors.black54,
-                        height: 1.25,
+                        height: 1.2,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-
-              // Indicador visual de navegación.
+              const SizedBox(width: 6),
               const Icon(
                 Icons.arrow_forward_ios,
-                size: 18,
+                size: 16,
                 color: Colors.black45,
               ),
             ],
