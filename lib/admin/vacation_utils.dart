@@ -3,41 +3,58 @@ import '../data/models/repositories/vacation_request.dart';
 
 /// Clase auxiliar con lógica compartida
 /// entre el calendario y el cuadrante de vacaciones.
+
+/// Centraliza cálculos y comprobaciones reutilizables.
 class VacationUtils {
 
   /// Comprueba si dos fechas corresponden
   /// exactamente al mismo día.
-  static bool sameDate(DateTime a, DateTime b) {
+  static bool sameDate(
+    DateTime a,
+    DateTime b,
+  ) {
+
     return a.year == b.year &&
         a.month == b.month &&
         a.day == b.day;
   }
 
-  /// Indica si una fecha corresponde
+  /// Comprueba si una fecha corresponde
   /// a sábado o domingo.
-  static bool isWeekend(DateTime day) {
-    return day.weekday == DateTime.saturday ||
-        day.weekday == DateTime.sunday;
+  static bool isWeekend(
+    DateTime day,
+  ) {
+
+    return day.weekday ==
+            DateTime.saturday ||
+        day.weekday ==
+            DateTime.sunday;
   }
 
-  /// Comprueba si una fecha coincide
-  /// con algún festivo.
+  /// Comprueba si un día es festivo
+  /// según la lista recibida.
   static bool isHoliday(
     DateTime day,
     List<Holiday> holidays,
   ) {
+
     return holidays.any(
-      (h) => sameDate(h.date, day),
+      (h) => sameDate(
+        h.date,
+        day,
+      ),
     );
   }
 
   /// Devuelve el nombre del festivo
-  /// correspondiente a una fecha.
+  /// correspondiente al día indicado.
   static String? holidayName(
     DateTime day,
     List<Holiday> holidays,
   ) {
+
     for (final h in holidays) {
+
       if (sameDate(h.date, day)) {
         return h.name;
       }
@@ -46,11 +63,13 @@ class VacationUtils {
     return null;
   }
 
-  /// Comprueba si una solicitud cubre un día concreto.
+  /// Comprueba si una solicitud
+  /// cubre un día concreto.
   static bool requestCoversDay(
     VacationRequest r,
     DateTime day,
   ) {
+
     final d = DateTime(
       day.year,
       day.month,
@@ -73,44 +92,51 @@ class VacationUtils {
         !d.isAfter(end);
   }
 
-  /// Comprueba si un día corresponde
-  /// a vacaciones aprobadas.
+  /// Comprueba si un día cuenta
+  /// como vacaciones aprobadas.
+  /// No se consideran fines de semana
+  /// ni festivos.
   static bool isApprovedVacationDay(
     VacationRequest r,
     DateTime day,
     List<Holiday> holidays,
   ) {
+
     return r.status == 'approved' &&
         !isWeekend(day) &&
         !isHoliday(day, holidays) &&
         requestCoversDay(r, day);
   }
 
-  /// Obtiene las solicitudes aprobadas
-  /// correspondientes a un día.
+  /// Obtiene todas las solicitudes aprobadas
+  /// para un día concreto.
   static List<VacationRequest>
       approvedRequestsForDay(
     DateTime day,
     List<VacationRequest> all,
     List<Holiday> holidays,
   ) {
+
     return all.where((r) {
+
       return isApprovedVacationDay(
         r,
         day,
         holidays,
       );
+
     }).toList();
   }
 
-  /// Comprueba si un empleado tiene vacaciones
-  /// aprobadas en un día concreto.
+  /// Comprueba si un empleado tiene
+  /// vacaciones aprobadas un día concreto.
   static bool employeeHasVacationOnDay(
     String employeeId,
     DateTime day,
     List<VacationRequest> all,
     List<Holiday> holidays,
   ) {
+
     return all.any(
       (r) =>
           r.employeeId == employeeId &&
@@ -127,6 +153,7 @@ class VacationUtils {
   static List<DateTime> daysInMonth(
     DateTime visibleMonth,
   ) {
+
     final lastDay = DateTime(
       visibleMonth.year,
       visibleMonth.month + 1,
@@ -144,13 +171,14 @@ class VacationUtils {
   }
 
   /// Calcula los días laborables
-  /// dentro de un rango y un año.
+  /// dentro de un rango y un año concreto.
   static int workingDaysInRangeWithinYear({
     required DateTime start,
     required DateTime end,
     required int year,
     required List<Holiday> holidays,
   }) {
+
     final rangeStart = DateTime(
       start.year,
       start.month,
@@ -163,30 +191,49 @@ class VacationUtils {
       end.day,
     );
 
-    final yearStart = DateTime(year, 1, 1);
-    final yearEnd = DateTime(year, 12, 31);
+    final yearStart =
+        DateTime(year, 1, 1);
 
+    final yearEnd =
+        DateTime(year, 12, 31);
+
+    /// Ajusta el inicio efectivo.
     final effectiveStart =
         rangeStart.isBefore(yearStart)
             ? yearStart
             : rangeStart;
 
+    /// Ajusta el fin efectivo.
     final effectiveEnd =
         rangeEnd.isAfter(yearEnd)
             ? yearEnd
             : rangeEnd;
 
-    if (effectiveEnd.isBefore(effectiveStart)) {
+    /// Si el rango es inválido.
+    if (effectiveEnd.isBefore(
+      effectiveStart,
+    )) {
+
       return 0;
     }
 
     int count = 0;
 
-    DateTime current = effectiveStart;
+    DateTime current =
+        effectiveStart;
 
-    while (!current.isAfter(effectiveEnd)) {
+    /// Recorre todos los días del rango.
+    while (!current.isAfter(
+      effectiveEnd,
+    )) {
+
+      /// Cuenta únicamente días laborables.
       if (!isWeekend(current) &&
-          !isHoliday(current, holidays)) {
+          !isHoliday(
+            current,
+            holidays,
+          )) {
+
         count++;
       }
 
@@ -198,23 +245,27 @@ class VacationUtils {
     return count;
   }
 
-  /// Calcula el total anual
-  /// de días aprobados para un empleado.
+  /// Calcula el total anual de días aprobados
+  /// para un empleado.
   static int approvedAnnualDaysForEmployee({
     required String employeeId,
     required List<VacationRequest> all,
     required int year,
     required List<Holiday> holidays,
   }) {
+
     return all
         .where(
           (r) =>
-              r.employeeId == employeeId &&
-              r.status == 'approved',
+              r.employeeId ==
+                  employeeId &&
+              r.status ==
+                  'approved',
         )
         .fold<int>(
       0,
       (total, r) {
+
         return total +
             workingDaysInRangeWithinYear(
               start: r.startDate,
