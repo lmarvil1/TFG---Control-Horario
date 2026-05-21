@@ -8,8 +8,16 @@ import '../data/models/repositories/vacation_request.dart';
 import '../data/models/repositories/vacations_repository.dart';
 import '../utils/app_snackbar.dart';
 
+/// Pantalla de vacaciones del trabajador.
+
+/// Permite consultar solicitudes, crear nuevas,
+/// cancelar solicitudes pendientes y solicitar la cancelación
+/// de vacaciones ya aprobadas.
 class WorkerVacationsPage extends StatefulWidget {
+  /// Identificador del empleado.
   final String employeeId;
+
+  /// Nombre del empleado.
   final String employeeName;
 
   const WorkerVacationsPage({
@@ -23,16 +31,25 @@ class WorkerVacationsPage extends StatefulWidget {
 }
 
 class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
+  /// Días de vacaciones disponibles por defecto.
   static const int defaultVacationDays = 22;
 
+  /// Repositorio de solicitudes de vacaciones.
   final repo = VacationsRepository();
+
+  /// Repositorio de festivos.
   final holidaysRepo = HolidaysRepository();
+
+  /// Formateador de fechas.
   final df = DateFormat('dd/MM/yyyy');
 
+  /// Filtro aplicado a la lista de solicitudes.
   String filter = 'all';
 
+  /// Normaliza una fecha eliminando la parte de hora.
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
+  /// Genera una clave única para una fecha en formato YYYY-MM-DD.
   String _dateKey(DateTime d) {
     final x = _dateOnly(d);
     return '${x.year.toString().padLeft(4, '0')}-'
@@ -40,15 +57,20 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
         '${x.day.toString().padLeft(2, '0')}';
   }
 
+  /// Comprueba si una fecha corresponde a sábado o domingo.
   bool _isWeekend(DateTime day) {
     return day.weekday == DateTime.saturday ||
         day.weekday == DateTime.sunday;
   }
 
+  /// Comprueba si una fecha está dentro del conjunto de festivos.
   bool _isHoliday(DateTime day, Set<String> holidayKeys) {
     return holidayKeys.contains(_dateKey(day));
   }
 
+  /// Calcula los días laborables entre dos fechas, ambas incluidas.
+  
+  /// No cuenta sábados, domingos ni festivos.
   int _workingDaysBetweenInclusive(
     DateTime start,
     DateTime end,
@@ -76,6 +98,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     return count;
   }
 
+  /// Devuelve el color asociado al estado de una solicitud.
   Color _statusColor(String status) {
     switch (status) {
       case 'approved':
@@ -91,6 +114,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     }
   }
 
+  /// Devuelve una etiqueta legible para el estado de una solicitud.
   String _statusLabel(String status) {
     switch (status) {
       case 'approved':
@@ -106,6 +130,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     }
   }
 
+  /// Devuelve el icono asociado al estado de una solicitud.
   IconData _statusIcon(String status) {
     switch (status) {
       case 'approved':
@@ -121,6 +146,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     }
   }
 
+  /// Muestra un diálogo para cancelar una solicitud pendiente.
   Future<void> _cancelPendingRequestDialog(VacationRequest request) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -166,6 +192,8 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     }
   }
 
+  /// Muestra un diálogo para solicitar la cancelación
+  /// de vacaciones aprobadas.
   Future<void> _requestCancellationDialog(VacationRequest request) async {
     final commentCtrl = TextEditingController();
 
@@ -256,6 +284,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     }
   }
 
+  /// Muestra un calendario personalizado para seleccionar una fecha.
   Future<DateTime?> _pickSingleDateWithCalendar({
     required String title,
     required DateTime initialDate,
@@ -301,7 +330,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                       calendarStyle: CalendarStyle(
                         outsideDaysVisible: false,
                         todayDecoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.35),
+                          color: Colors.blue.withValues(alpha:0.35),
                           shape: BoxShape.circle,
                         ),
                         selectedDecoration: const BoxDecoration(
@@ -317,7 +346,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                           shape: BoxShape.circle,
                         ),
                         withinRangeDecoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.15),
+                          color: Colors.blue.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
                         weekendTextStyle: const TextStyle(
@@ -328,7 +357,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                           fontWeight: FontWeight.bold,
                         ),
                         holidayDecoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.15),
+                          color: Colors.red.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -358,12 +387,12 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                             margin: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               color: isHoliday
-                                  ? Colors.red.withOpacity(0.15)
-                                  : Colors.grey.withOpacity(0.10),
+                                  ? Colors.red.withValues(alpha: 0.15)
+                                  : Colors.grey.withValues(alpha: 0.10),
                               shape: BoxShape.circle,
                               border: isHoliday
                                   ? Border.all(
-                                      color: Colors.red.withOpacity(0.5),
+                                      color: Colors.red.withValues(alpha: 0.5),
                                     )
                                   : null,
                             ),
@@ -394,10 +423,10 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                               width: 14,
                               height: 14,
                               decoration: BoxDecoration(
-                                color: Colors.red.withOpacity(0.15),
+                                color: Colors.red.withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Colors.red.withOpacity(0.5),
+                                  color: Colors.red.withValues(alpha: 0.5),
                                 ),
                               ),
                             ),
@@ -412,7 +441,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                               width: 14,
                               height: 14,
                               decoration: BoxDecoration(
-                                color: Colors.grey.withOpacity(0.10),
+                                color: Colors.grey.withValues(alpha: 0.10),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -444,6 +473,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     );
   }
 
+  /// Abre el formulario para crear una solicitud de vacaciones.
   Future<void> _openRequestDialog(
     int remainingDays,
     Set<String> holidayKeys,
@@ -696,13 +726,14 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     }
   }
 
+  /// Construye una etiqueta visual con el estado de la solicitud.
   Widget _statusChip(String status) {
     final c = _statusColor(status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: c.withOpacity(0.12),
+        color: c.withValues(alpha: 0.12),
         border: Border.all(color: c),
         borderRadius: BorderRadius.circular(999),
       ),
@@ -726,6 +757,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     );
   }
 
+  /// Construye los filtros por estado de solicitud.
   Widget _filterChips() {
     Widget chip({
       required String value,
@@ -786,6 +818,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     );
   }
 
+  /// Construye una tarjeta resumen con datos de vacaciones.
   Widget _summaryCard({
     required String title,
     required String value,
@@ -828,6 +861,7 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
     );
   }
 
+  /// Construye la tarjeta visual de una solicitud de vacaciones.
   Widget _buildRequestCard(VacationRequest r) {
     final width = MediaQuery.of(context).size.width;
     final isSmall = width < 380;
@@ -891,10 +925,10 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.blueGrey.withOpacity(0.06),
+                  color: Colors.blueGrey.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: Colors.blueGrey.withOpacity(0.20),
+                    color: Colors.blueGrey.withValues(alpha: 0.20),
                   ),
                 ),
                 child: Column(
@@ -922,10 +956,10 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.08),
+                  color: Colors.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: Colors.red.withOpacity(0.35),
+                    color: Colors.red.withValues(alpha: 0.35),
                   ),
                 ),
                 child: Column(
@@ -964,10 +998,10 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.deepOrange.withOpacity(0.08),
+                  color: Colors.deepOrange.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: Colors.deepOrange.withOpacity(0.35),
+                    color: Colors.deepOrange.withValues(alpha: 0.35),
                   ),
                 ),
                 child: Column(
@@ -1006,10 +1040,10 @@ class _WorkerVacationsPageState extends State<WorkerVacationsPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.12),
+                  color: Colors.amber.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: Colors.amber.withOpacity(0.45),
+                    color: Colors.amber.withValues(alpha: 0.45),
                   ),
                 ),
                 child: Column(

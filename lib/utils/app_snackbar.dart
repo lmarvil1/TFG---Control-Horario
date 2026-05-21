@@ -1,10 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+/// Clase auxiliar para mostrar mensajes personalizados
+/// en la parte superior de la pantalla.
+
 class AppSnackbar {
+  /// Referencia al mensaje que se está mostrando actualmente.
   static OverlayEntry? _currentEntry;
+
+  /// Temporizador encargado de cerrar automáticamente el mensaje.
   static Timer? _timer;
 
+  /// Muestra un mensaje en la parte superior de la pantalla.
+  /// Si ya existe otro mensaje visible, se elimina antes de mostrar el nuevo.
+  
+  /// Parámetros:
+  /// - context: contexto actual de la interfaz
+  /// - message: texto que se mostrará al usuario
+  /// - isError: indica si el mensaje corresponde a un error
   static void show(
     BuildContext context,
     String message, {
@@ -15,11 +28,10 @@ class AppSnackbar {
     _currentEntry = null;
 
     final overlay = Overlay.of(context);
-    if (overlay == null) return;
 
     final color = isError
-        ? const Color(0xFFD96C6C) // rojo suave
-        : const Color(0xFF5C7FA3); // azul grisáceo suave
+        ? const Color(0xFFD96C6C)
+        : const Color(0xFF5C7FA3);
 
     final entry = OverlayEntry(
       builder: (context) => _TopSnackbarWidget(
@@ -38,8 +50,12 @@ class AppSnackbar {
   }
 }
 
+/// Widget interno encargado de representar visualmente el mensaje superior.
 class _TopSnackbarWidget extends StatefulWidget {
+  /// Texto mostrado dentro del mensaje.
   final String message;
+
+  /// Color de fondo del mensaje.
   final Color backgroundColor;
 
   const _TopSnackbarWidget({
@@ -53,8 +69,13 @@ class _TopSnackbarWidget extends StatefulWidget {
 
 class _TopSnackbarWidgetState extends State<_TopSnackbarWidget>
     with SingleTickerProviderStateMixin {
+  /// Controlador de la animación de entrada.
   late final AnimationController _controller;
+
+  /// Animación de desplazamiento vertical.
   late final Animation<Offset> _offsetAnimation;
+
+  /// Animación de opacidad.
   late final Animation<double> _opacityAnimation;
 
   @override
@@ -115,7 +136,7 @@ class _TopSnackbarWidgetState extends State<_TopSnackbarWidget>
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
+                      color: Colors.black.withValues(alpha: 0.12),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),

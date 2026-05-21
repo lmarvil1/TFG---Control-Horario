@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/models/repositories/notifications_repository.dart';
+import '../utils/app_snackbar.dart';
 
 /// Pantalla de gestión de notificaciones del usuario.
 /// Permite consultar notificaciones, marcarlas como leídas,
@@ -107,24 +108,21 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            count == 1
-                ? 'Notificación eliminada'
-                : '$count notificaciones eliminadas',
-          ),
-        ),
+      AppSnackbar.show(
+        context,
+        count == 1
+            ? 'Notificación eliminada'
+            : '$count notificaciones eliminadas',
       );
 
       _clearSelection();
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error eliminando notificaciones: $e'),
-        ),
+      AppSnackbar.show(
+        context,
+        'Error eliminando notificaciones: $e',
+        isError: true,
       );
     } finally {
       if (mounted) {
@@ -167,20 +165,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Todas las notificaciones han sido eliminadas'),
-        ),
+      AppSnackbar.show(
+        context,
+        'Todas las notificaciones han sido eliminadas',
       );
 
       _clearSelection();
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error eliminando todas las notificaciones: $e'),
-        ),
+      AppSnackbar.show(
+        context,
+        'Error eliminando todas las notificaciones: $e',
+        isError: true,
       );
     } finally {
       if (mounted) {
@@ -313,7 +310,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 return ListTile(
                   selected: selected,
                   selectedTileColor:
-                      Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                      Theme.of(context).colorScheme.primary.withValues(alpha:0.08),
                   leading: _selectionMode
                       ? Checkbox(
                           value: selected,
@@ -321,11 +318,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         )
                       : CircleAvatar(
                           backgroundColor: n.isRead
-                              ? Colors.grey.withOpacity(0.15)
+                              ? Colors.grey.withValues(alpha:0.15)
                               : Theme.of(context)
                                   .colorScheme
                                   .primary
-                                  .withOpacity(0.15),
+                                  .withValues(alpha:0.15),
                           child: Icon(
                             _iconForType(n.type),
                             color: n.isRead

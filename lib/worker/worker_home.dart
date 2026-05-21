@@ -15,7 +15,17 @@ import 'punches_history_page.dart';
 import 'worker_payrolls_page.dart';
 import 'worker_requests_page.dart';
 
+/// Pantalla principal del trabajador.
+
+/// Desde esta vista el empleado puede:
+/// - Registrar entradas y salidas
+/// - Consultar el historial de fichajes
+/// - Gestionar solicitudes (vacaciones e incidencias)
+/// - Subir justificantes
+/// - Consultar nóminas
+/// - Acceder a notificaciones
 class WorkerHome extends StatefulWidget {
+  /// Indica si la vista se ha abierto desde el panel administrador.
   final bool launchedFromAdmin;
 
   const WorkerHome({
@@ -28,16 +38,26 @@ class WorkerHome extends StatefulWidget {
 }
 
 class _WorkerHomeState extends State<WorkerHome> {
-  final NotificationsRepository _notificationsRepo = NotificationsRepository();
+  /// Repositorio encargado de gestionar las notificaciones.
+  final NotificationsRepository _notificationsRepo =
+      NotificationsRepository();
 
+  /// employeeId almacenado localmente.
   String? cachedEmployeeId;
+
+  /// Último employeeId obtenido desde Firestore.
   String? _lastCachedFromFirestore;
+
+  /// Índice de la pestaña activa.
   int _tabIndex = 0;
+
+  /// Evita mostrar varias veces las notificaciones iniciales.
   bool _startupNotificationsShown = false;
 
   @override
   void initState() {
     super.initState();
+
     _loadCachedEmployeeId();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -48,9 +68,14 @@ class _WorkerHomeState extends State<WorkerHome> {
     });
   }
 
+  /// Muestra notificaciones pendientes al iniciar la aplicación.
   Future<void> _showStartupSnackbars() async {
     try {
-      final unread = await _notificationsRepo.fetchUnreadForStartup(limit: 3);
+      final unread =
+          await _notificationsRepo.fetchUnreadForStartup(
+        limit: 3,
+      );
+
       if (!mounted || unread.isEmpty) return;
 
       if (unread.length > 3) {
@@ -58,49 +83,84 @@ class _WorkerHomeState extends State<WorkerHome> {
           context,
           'Tienes ${unread.length} notificaciones nuevas',
         );
+
         return;
       }
 
       for (final n in unread) {
         if (!mounted) return;
+
         AppSnackbar.show(
           context,
           '${n.title}: ${n.body}',
         );
-        await Future.delayed(const Duration(milliseconds: 2300));
+
+        await Future.delayed(
+          const Duration(milliseconds: 2300),
+        );
       }
     } catch (_) {}
   }
 
+  /// Recupera el employeeId almacenado localmente.
   Future<void> _loadCachedEmployeeId() async {
     final user = FirebaseAuth.instance.currentUser!;
-    final prefs = await SharedPreferences.getInstance();
-    final v = prefs.getString('employeeId_${user.uid}');
+
+    final prefs =
+        await SharedPreferences.getInstance();
+
+    final v =
+        prefs.getString('employeeId_${user.uid}');
+
     final cleaned = v?.trim();
-    if (mounted) setState(() => cachedEmployeeId = cleaned);
+
+    if (mounted) {
+      setState(() => cachedEmployeeId = cleaned);
+    }
   }
 
-  Future<void> _cacheEmployeeId(String employeeId) async {
+  /// Guarda el employeeId en almacenamiento local.
+  Future<void> _cacheEmployeeId(
+    String employeeId,
+  ) async {
     final cleaned = employeeId.trim();
+
     if (cleaned.isEmpty) return;
 
     final user = FirebaseAuth.instance.currentUser!;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('employeeId_${user.uid}', cleaned);
-    if (mounted) setState(() => cachedEmployeeId = cleaned);
+
+    final prefs =
+        await SharedPreferences.getInstance();
+
+    await prefs.setString(
+      'employeeId_${user.uid}',
+      cleaned,
+    );
+
+    if (mounted) {
+      setState(() => cachedEmployeeId = cleaned);
+    }
   }
 
+  /// Construye la barra superior de navegación.
   AppBar _buildTopBar(String displayName) {
     return AppBar(
-      automaticallyImplyLeading: !widget.launchedFromAdmin,
+      automaticallyImplyLeading:
+          !widget.launchedFromAdmin,
+
       title: Text(
         displayName,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
+
       actions: [
+
+        /// Botón de notificaciones con contador de pendientes.
         StreamBuilder<int>(
-          stream: _notificationsRepo.streamUnreadCount(),
+          stream:
+              _notificationsRepo.streamUnreadCount(),
+
           builder: (context, snap) {
             final unreadCount = snap.data ?? 0;
 
@@ -109,41 +169,62 @@ class _WorkerHomeState extends State<WorkerHome> {
               children: [
                 IconButton(
                   tooltip: 'Notificaciones',
-                  icon: const Icon(Icons.notifications_outlined),
+                  icon: const Icon(
+                    Icons.notifications_outlined,
+                  ),
+
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const NotificationsPage(),
+                        builder: (_) =>
+                            const NotificationsPage(),
                       ),
                     );
                   },
                 ),
+
+                /// Indicador visual de notificaciones no leídas.
                 if (unreadCount > 0)
                   Positioned(
                     right: 8,
                     top: 8,
+
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
+                      padding:
+                          const EdgeInsets.symmetric(
                         horizontal: 5,
                         vertical: 2,
                       ),
-                      decoration: const BoxDecoration(
+
+                      decoration:
+                          const BoxDecoration(
                         color: Colors.red,
                         shape: BoxShape.rectangle,
-                        borderRadius: BorderRadius.all(Radius.circular(10)),
+                        borderRadius:
+                            BorderRadius.all(
+                          Radius.circular(10),
+                        ),
                       ),
-                      constraints: const BoxConstraints(
+
+                      constraints:
+                          const BoxConstraints(
                         minWidth: 18,
                         minHeight: 18,
                       ),
+
                       child: Text(
-                        unreadCount > 99 ? '99+' : '$unreadCount',
+                        unreadCount > 99
+                            ? '99+'
+                            : '$unreadCount',
+
                         textAlign: TextAlign.center,
+
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
-                          fontWeight: FontWeight.bold,
+                          fontWeight:
+                              FontWeight.bold,
                         ),
                       ),
                     ),
@@ -152,13 +233,19 @@ class _WorkerHomeState extends State<WorkerHome> {
             );
           },
         ),
+
+        /// Botón para cerrar sesión o volver al panel administrador.
         IconButton(
           tooltip: widget.launchedFromAdmin
               ? 'Volver al panel admin'
               : 'Cerrar sesión',
+
           icon: Icon(
-            widget.launchedFromAdmin ? Icons.switch_account : Icons.logout,
+            widget.launchedFromAdmin
+                ? Icons.switch_account
+                : Icons.logout,
           ),
+
           onPressed: () async {
             if (widget.launchedFromAdmin) {
               Navigator.of(context).pop();
@@ -174,50 +261,91 @@ class _WorkerHomeState extends State<WorkerHome> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
-    final userDocStream =
-        FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots();
 
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    final userDocStream = FirebaseFirestore
+        .instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots();
+
+    return StreamBuilder<
+        DocumentSnapshot<Map<String, dynamic>>>(
       stream: userDocStream,
+
       builder: (context, snap) {
         String? employeeId;
 
         final data = snap.data?.data();
-        final name = (data?['name'] as String?)?.trim();
+
+        final name =
+            (data?['name'] as String?)?.trim();
+
         final baseDisplayName =
-            (name != null && name.isNotEmpty) ? name : 'Trabajador';
-        final displayName = widget.launchedFromAdmin
-            ? '$baseDisplayName · Vista trabajador'
-            : baseDisplayName;
+            (name != null && name.isNotEmpty)
+                ? name
+                : 'Trabajador';
 
+        final displayName =
+            widget.launchedFromAdmin
+                ? '$baseDisplayName · Vista trabajador'
+                : baseDisplayName;
+
+        /// Obtiene el employeeId desde Firestore.
         if (snap.hasData) {
-          final fromFirestoreRaw = data?['employeeId'] as String?;
-          final fromFirestore = fromFirestoreRaw?.trim();
+          final fromFirestoreRaw =
+              data?['employeeId'] as String?;
 
-          if (fromFirestore != null && fromFirestore.isNotEmpty) {
+          final fromFirestore =
+              fromFirestoreRaw?.trim();
+
+          if (fromFirestore != null &&
+              fromFirestore.isNotEmpty) {
+
             employeeId = fromFirestore;
 
-            if (_lastCachedFromFirestore != fromFirestore) {
-              _lastCachedFromFirestore = fromFirestore;
-              Future.microtask(() => _cacheEmployeeId(fromFirestore));
+            /// Actualiza la caché local si cambia el valor.
+            if (_lastCachedFromFirestore !=
+                fromFirestore) {
+
+              _lastCachedFromFirestore =
+                  fromFirestore;
+
+              Future.microtask(
+                () => _cacheEmployeeId(
+                  fromFirestore,
+                ),
+              );
             }
+
           } else {
-            employeeId = cachedEmployeeId?.trim();
+
+            /// Usa la copia local si Firestore todavía no responde.
+            employeeId =
+                cachedEmployeeId?.trim();
           }
+
         } else {
-          employeeId = cachedEmployeeId?.trim();
+
+          employeeId =
+              cachedEmployeeId?.trim();
         }
 
-        if (employeeId == null || employeeId.trim().isEmpty) {
+        /// Si el usuario aún no tiene empleado asignado.
+        if (employeeId == null ||
+            employeeId.trim().isEmpty) {
+
           return Scaffold(
             appBar: _buildTopBar(displayName),
+
             body: const SafeArea(
               child: Center(
                 child: Padding(
                   padding: EdgeInsets.all(16),
+
                   child: Text(
                     'Tu cuenta aún no está asignada a un empleado.\n\n'
                     'Pide al administrador que te asigne.',
+
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -228,36 +356,63 @@ class _WorkerHomeState extends State<WorkerHome> {
 
         final empId = employeeId.trim();
 
+        /// Lista de pantallas disponibles.
         final pages = <Widget>[
+
+          /// Pantalla principal de fichaje.
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding:
+                      const EdgeInsets.all(16),
+
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
+                      minHeight:
+                          constraints.maxHeight,
                     ),
+
                     child: Center(
-                      child: _PunchButtons(employeeId: empId),
+                      child: _PunchButtons(
+                        employeeId: empId,
+                      ),
                     ),
                   ),
                 );
               },
             ),
           ),
-          PunchesHistoryPage(employeeId: empId),
-          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+
+          /// Historial de fichajes.
+          PunchesHistoryPage(
+            employeeId: empId,
+          ),
+
+          /// Solicitudes del trabajador.
+          StreamBuilder<
+              DocumentSnapshot<
+                  Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
                 .collection('employees')
                 .doc(empId)
                 .snapshots(),
+
             builder: (context, empSnap) {
-              final empData = empSnap.data?.data();
+              final empData =
+                  empSnap.data?.data();
+
               final employeeName =
-                  ((empData?['name'] ?? displayName).toString().trim().isEmpty)
+                  ((empData?['name'] ??
+                                  displayName)
+                              .toString()
+                              .trim()
+                              .isEmpty)
                       ? displayName
-                      : (empData?['name'] ?? displayName).toString().trim();
+                      : (empData?['name'] ??
+                              displayName)
+                          .toString()
+                          .trim();
 
               return WorkerRequestsPage(
                 employeeId: empId,
@@ -265,26 +420,42 @@ class _WorkerHomeState extends State<WorkerHome> {
               );
             },
           ),
+
+          /// Gestión de justificantes.
           JustificationsPage(
             employeeId: empId,
             showAppBar: false,
           ),
-          WorkerPayrollsPage(employeeId: empId),
+
+          /// Consulta de nóminas.
+          WorkerPayrollsPage(
+            employeeId: empId,
+          ),
         ];
 
-        if (_tabIndex < 0 || _tabIndex >= pages.length) {
+        /// Evita índices inválidos.
+        if (_tabIndex < 0 ||
+            _tabIndex >= pages.length) {
           _tabIndex = 0;
         }
 
         return Scaffold(
           appBar: _buildTopBar(displayName),
+
+          /// Mantiene el estado interno de las pantallas.
           body: IndexedStack(
             index: _tabIndex,
             children: pages,
           ),
+
+          /// Barra inferior de navegación.
           bottomNavigationBar: NavigationBar(
             selectedIndex: _tabIndex,
-            onDestinationSelected: (i) => setState(() => _tabIndex = i),
+
+            onDestinationSelected: (i) {
+              setState(() => _tabIndex = i);
+            },
+
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.fingerprint),
@@ -314,24 +485,42 @@ class _WorkerHomeState extends State<WorkerHome> {
   }
 }
 
+/// Widget encargado de gestionar los botones de fichaje.
 class _PunchButtons extends StatefulWidget {
+  /// Identificador del empleado asociado.
   final String employeeId;
 
-  const _PunchButtons({required this.employeeId});
+  const _PunchButtons({
+    required this.employeeId,
+  });
 
   @override
-  State<_PunchButtons> createState() => _PunchButtonsState();
+  State<_PunchButtons> createState() =>
+      _PunchButtonsState();
 }
 
-class _PunchButtonsState extends State<_PunchButtons> {
+class _PunchButtonsState
+    extends State<_PunchButtons> {
+
+  /// Repositorio encargado de guardar fichajes.
   final repo = PunchesRepository();
 
+  /// Indica si se está procesando un fichaje.
   bool busy = false;
+
+  /// Mensaje de error mostrado en pantalla.
   String? error;
+
+  /// Último tipo de fichaje registrado.
   String? lastType;
 
+  /// Mensaje informativo temporal.
   String? infoMessage;
+
+  /// Indica si el mensaje temporal corresponde a un error.
   bool infoIsError = false;
+
+  /// Temporizador para ocultar mensajes temporales.
   Timer? _messageTimer;
 
   @override
@@ -346,26 +535,41 @@ class _PunchButtonsState extends State<_PunchButtons> {
     super.dispose();
   }
 
+  /// Recupera el último fichaje registrado.
   Future<void> _loadLast() async {
     try {
-      final t = await repo.getLastType(widget.employeeId);
-      if (mounted) setState(() => lastType = t);
+      final t =
+          await repo.getLastType(widget.employeeId);
+
+      if (mounted) {
+        setState(() => lastType = t);
+      }
     } catch (_) {}
   }
 
-  void _showTemporaryMessage(String msg, {bool isError = false}) {
+  /// Muestra mensajes temporales informativos.
+  void _showTemporaryMessage(
+    String msg, {
+    bool isError = false,
+  }) {
     _messageTimer?.cancel();
+
     setState(() {
       infoMessage = msg;
       infoIsError = isError;
     });
 
-    _messageTimer = Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() => infoMessage = null);
-    });
+    _messageTimer = Timer(
+      const Duration(seconds: 2),
+      () {
+        if (!mounted) return;
+
+        setState(() => infoMessage = null);
+      },
+    );
   }
 
+  /// Registra un fichaje de entrada o salida.
   Future<void> _punch(String type) async {
     if (busy) return;
 
@@ -377,46 +581,76 @@ class _PunchButtonsState extends State<_PunchButtons> {
       lastType = type;
     });
 
-    Future.delayed(const Duration(milliseconds: 250), () {
-      if (mounted) setState(() => busy = false);
-    });
+    Future.delayed(
+      const Duration(milliseconds: 250),
+      () {
+        if (mounted) {
+          setState(() => busy = false);
+        }
+      },
+    );
 
-    final online = await ConnectivityService.hasInternet();
+    final online =
+        await ConnectivityService.hasInternet();
 
     _showTemporaryMessage(
       online
           ? 'Fichaje guardado'
-          : 'Fichaje guardado sin conexión. Se sincronizará cuando vuelva internet.',
+          : 'Fichaje guardado sin conexión. '
+              'Se sincronizará cuando vuelva internet.',
     );
 
-    repo.addPunch(employeeId: widget.employeeId, type: type).catchError((e) {
-      if (!mounted) return Future.value();
+    try {
+      await repo.addPunch(
+        employeeId: widget.employeeId,
+        type: type,
+      );
+    } catch (e) {
+      if (!mounted) return;
 
       setState(() {
         lastType = prev;
         error = e.toString();
       });
 
-      _showTemporaryMessage('Error guardando fichaje', isError: true);
-      return Future.value();
-    });
+      _showTemporaryMessage(
+        'Error guardando fichaje',
+        isError: true,
+      );
+    }
   }
 
+  /// Devuelve la etiqueta correspondiente al último fichaje.
   String _lastLabel() {
     if (lastType == 'in') return 'ENTRADA';
     if (lastType == 'out') return 'SALIDA';
+
     return 'SIN FICHAJES';
   }
 
+  /// Devuelve el icono correspondiente al último fichaje.
   IconData _lastIcon() {
-    if (lastType == 'in') return Icons.login_rounded;
-    if (lastType == 'out') return Icons.logout_rounded;
+    if (lastType == 'in') {
+      return Icons.login_rounded;
+    }
+
+    if (lastType == 'out') {
+      return Icons.logout_rounded;
+    }
+
     return Icons.fingerprint_rounded;
   }
 
+  /// Devuelve el color asociado al último fichaje.
   Color _lastColor() {
-    if (lastType == 'in') return const Color(0xFF6FAF73);
-    if (lastType == 'out') return const Color(0xFFD97A7A);
+    if (lastType == 'in') {
+      return const Color(0xFF6FAF73);
+    }
+
+    if (lastType == 'out') {
+      return const Color(0xFFD97A7A);
+    }
+
     return Colors.blueGrey;
   }
 
@@ -427,34 +661,52 @@ class _PunchButtonsState extends State<_PunchButtons> {
 
     final buttonStyle = ElevatedButton.styleFrom(
       padding: const EdgeInsets.symmetric(vertical: 24),
+
       textStyle: const TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.bold,
         letterSpacing: 1,
       ),
+
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
+
       elevation: 2,
     );
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+
+        /// Tarjeta con el último fichaje realizado.
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 18),
+
+          padding:
+              const EdgeInsets.symmetric(
+            vertical: 22,
+            horizontal: 18,
+          ),
+
           decoration: BoxDecoration(
-            color: _lastColor().withOpacity(0.10),
-            borderRadius: BorderRadius.circular(18),
+            color:
+                _lastColor().withValues(alpha: 0.10),
+
+            borderRadius:
+                BorderRadius.circular(18),
+
             border: Border.all(
-              color: _lastColor().withOpacity(0.35),
+              color:
+                  _lastColor().withValues(alpha: 0.35),
             ),
           ),
+
           child: Column(
             children: [
               const Text(
                 'ÚLTIMO FICHAJE',
+
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -462,16 +714,21 @@ class _PunchButtonsState extends State<_PunchButtons> {
                   color: Colors.black54,
                 ),
               ),
+
               const SizedBox(height: 12),
+
               Icon(
                 _lastIcon(),
                 size: 42,
                 color: _lastColor(),
               ),
+
               const SizedBox(height: 10),
+
               Text(
                 _lastLabel(),
                 textAlign: TextAlign.center,
+
                 style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.w900,
@@ -482,53 +739,104 @@ class _PunchButtonsState extends State<_PunchButtons> {
             ],
           ),
         ),
+
         const SizedBox(height: 34),
+
+        /// Botón de entrada.
         SizedBox(
           width: double.infinity,
           height: 90,
+
           child: ElevatedButton.icon(
             style: buttonStyle.copyWith(
-              backgroundColor: MaterialStateProperty.all(entryColor),
-              foregroundColor: MaterialStateProperty.all(Colors.white),
+              backgroundColor:
+                  WidgetStateProperty.all(
+                entryColor,
+              ),
+
+              foregroundColor:
+                  WidgetStateProperty.all(
+                Colors.white,
+              ),
             ),
-            icon: const Icon(Icons.login, size: 34),
+
+            icon: const Icon(
+              Icons.login,
+              size: 34,
+            ),
+
             label: const Text('ENTRADA'),
-            onPressed: !busy ? () => _punch('in') : null,
+
+            onPressed:
+                !busy
+                    ? () => _punch('in')
+                    : null,
           ),
         ),
+
         const SizedBox(height: 28),
+
+        /// Botón de salida.
         SizedBox(
           width: double.infinity,
           height: 90,
+
           child: ElevatedButton.icon(
             style: buttonStyle.copyWith(
-              backgroundColor: MaterialStateProperty.all(exitColor),
-              foregroundColor: MaterialStateProperty.all(Colors.white),
+              backgroundColor:
+                  WidgetStateProperty.all(
+                exitColor,
+              ),
+
+              foregroundColor:
+                  WidgetStateProperty.all(
+                Colors.white,
+              ),
             ),
-            icon: const Icon(Icons.logout, size: 34),
+
+            icon: const Icon(
+              Icons.logout,
+              size: 34,
+            ),
+
             label: const Text('SALIDA'),
-            onPressed: !busy ? () => _punch('out') : null,
+
+            onPressed:
+                !busy
+                    ? () => _punch('out')
+                    : null,
           ),
         ),
+
+        /// Mensaje temporal informativo.
         if (infoMessage != null) ...[
           const SizedBox(height: 18),
+
           Text(
             infoMessage!,
             textAlign: TextAlign.center,
+
             style: TextStyle(
               fontWeight: FontWeight.w600,
+
               color: infoIsError
                   ? const Color(0xFFC62828)
                   : const Color(0xFF2E7D32),
             ),
           ),
         ],
+
+        /// Mensaje de error permanente.
         if (error != null) ...[
           const SizedBox(height: 14),
+
           Text(
             error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.red),
+
+            style: const TextStyle(
+              color: Colors.red,
+            ),
           ),
         ],
       ],

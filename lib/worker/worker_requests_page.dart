@@ -3,8 +3,16 @@ import 'package:flutter/material.dart';
 import 'worker_incidents_page.dart';
 import 'worker_vacations_page.dart';
 
+/// Pantalla de acceso a las solicitudes del trabajador.
+
+/// Agrupa las opciones relacionadas con:
+/// - incidencias
+/// - vacaciones
 class WorkerRequestsPage extends StatelessWidget {
+  /// Identificador del empleado asociado.
   final String employeeId;
+
+  /// Nombre del empleado asociado.
   final String employeeName;
 
   const WorkerRequestsPage({
@@ -26,7 +34,9 @@ class WorkerRequestsPage extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
+
           const SizedBox(height: 8),
+
           const Text(
             'Gestiona tus incidencias y vacaciones desde este apartado.',
             style: TextStyle(
@@ -34,6 +44,7 @@ class WorkerRequestsPage extends StatelessWidget {
               color: Colors.black54,
             ),
           ),
+
           const SizedBox(height: 20),
 
           _RequestCard(
@@ -74,10 +85,18 @@ class WorkerRequestsPage extends StatelessWidget {
   }
 }
 
+/// Tarjeta reutilizable para mostrar una opción de solicitud.
 class _RequestCard extends StatelessWidget {
+  /// Icono representativo de la opción.
   final IconData icon;
+
+  /// Título principal de la tarjeta.
   final String title;
+
+  /// Descripción breve de la opción.
   final String subtitle;
+
+  /// Acción ejecutada al pulsar la tarjeta.
   final VoidCallback onTap;
 
   const _RequestCard({
@@ -91,31 +110,42 @@ class _RequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 2,
+
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
       ),
+
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
+
         child: Padding(
           padding: const EdgeInsets.all(18),
+
           child: Row(
             children: [
               Container(
                 width: 52,
                 height: 52,
+
                 decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.12),
+
                   borderRadius: BorderRadius.circular(14),
                 ),
+
                 child: Icon(
                   icon,
                   size: 28,
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
+
               const SizedBox(width: 16),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,7 +157,9 @@ class _RequestCard extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+
                     const SizedBox(height: 6),
+
                     Text(
                       subtitle,
                       style: const TextStyle(
@@ -138,7 +170,9 @@ class _RequestCard extends StatelessWidget {
                   ],
                 ),
               ),
+
               const SizedBox(width: 8),
+
               const Icon(Icons.chevron_right),
             ],
           ),

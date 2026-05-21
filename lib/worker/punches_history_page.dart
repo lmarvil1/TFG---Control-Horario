@@ -7,8 +7,17 @@ import 'package:intl/intl.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/export_service.dart';
 import '../utils/file_downloader.dart';
+import '../utils/work_time.dart';
 
+/// Pantalla encargada de mostrar el historial de fichajes.
+
+/// Permite:
+/// - Consultar fichajes diarios o mensuales
+/// - Calcular horas trabajadas
+/// - Calcular horas ordinarias y extraordinarias
+/// - Exportar el historial mensual en PDF
 class PunchesHistoryPage extends StatefulWidget {
+  /// Identificador del empleado asociado.
   final String employeeId;
 
   const PunchesHistoryPage({
@@ -17,23 +26,35 @@ class PunchesHistoryPage extends StatefulWidget {
   });
 
   @override
-  State<PunchesHistoryPage> createState() => _PunchesHistoryPageState();
+  State<PunchesHistoryPage> createState() =>
+      _PunchesHistoryPageState();
 }
 
-class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
+class _PunchesHistoryPageState
+    extends State<PunchesHistoryPage> {
+  /// Formateador de fechas.
   final dfDay = DateFormat('dd/MM/yyyy');
+
+  /// Formateador de horas.
   final dfTime = DateFormat('HH:mm');
 
-  /// 0 = Día | 1 = Mes
+  /// Modo seleccionado:
+  /// 0 = Día
+  /// 1 = Mes
   int mode = 0;
 
+  /// Día actualmente seleccionado.
   DateTime selectedDay = DateTime.now();
-  DateTime selectedMonth =
-      DateTime(DateTime.now().year, DateTime.now().month, 1);
 
+  /// Mes actualmente seleccionado.
+  DateTime selectedMonth = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    1,
+  );
+
+  /// Nombre visible del empleado.
   String? employeeLabel;
-
-  static const int ordinaryDailyMinutes = 480; // 8 horas
 
   @override
   void initState() {
@@ -41,6 +62,7 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
     _loadEmployeeLabel();
   }
 
+  /// Obtiene el nombre del empleado desde Firestore.
   Future<void> _loadEmployeeLabel() async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -49,20 +71,24 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
           .get();
 
       final data = doc.data();
+
       final name = (data?['name'] ?? '').toString().trim();
 
       if (!mounted) return;
+
       setState(() {
         employeeLabel = name.isEmpty ? widget.employeeId : name;
       });
     } catch (_) {
       if (!mounted) return;
+
       setState(() {
         employeeLabel = widget.employeeId;
       });
     }
   }
 
+  /// Permite seleccionar un día concreto.
   Future<void> _pickDay() async {
     final d = await showDatePicker(
       context: context,
@@ -71,11 +97,15 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
       firstDate: DateTime(2020, 1, 1),
       lastDate: DateTime.now(),
     );
+
     if (d != null) {
-      setState(() => selectedDay = DateTime(d.year, d.month, d.day));
+      setState(() {
+        selectedDay = DateTime(d.year, d.month, d.day);
+      });
     }
   }
 
+  /// Permite seleccionar un mes concreto.
   Future<void> _pickMonth() async {
     final d = await showDatePicker(
       context: context,
@@ -84,86 +114,65 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
       firstDate: DateTime(2020, 1, 1),
       lastDate: DateTime.now(),
     );
+
     if (d != null) {
-      setState(() => selectedMonth = DateTime(d.year, d.month, 1));
+      setState(() {
+        selectedMonth = DateTime(d.year, d.month, 1);
+      });
     }
   }
 
+  /// Devuelve la fecha inicial del rango consultado.
   DateTime _rangeStart() {
     if (mode == 0) {
-      return DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
+      return DateTime(
+        selectedDay.year,
+        selectedDay.month,
+        selectedDay.day,
+      );
     }
-    return DateTime(selectedMonth.year, selectedMonth.month, 1);
+
+    return DateTime(
+      selectedMonth.year,
+      selectedMonth.month,
+      1,
+    );
   }
 
+  /// Devuelve la fecha final exclusiva del rango consultado.
   DateTime _rangeEndExclusive() {
-    if (mode == 0) return _rangeStart().add(const Duration(days: 1));
+    if (mode == 0) {
+      return _rangeStart().add(
+        const Duration(days: 1),
+      );
+    }
 
-    final start = DateTime(selectedMonth.year, selectedMonth.month, 1);
+    final start = DateTime(
+      selectedMonth.year,
+      selectedMonth.month,
+      1,
+    );
+
     return (start.month == 12)
         ? DateTime(start.year + 1, 1, 1)
-        : DateTime(start.year, start.month + 1, 1);
+        : DateTime(
+            start.year,
+            start.month + 1,
+            1,
+          );
   }
 
-  int _workedMinutes(List<_Punch> punches) {
-    int minutes = 0;
-    DateTime? openIn;
-
-    for (final p in punches) {
-      if (p.type == 'in') {
-        openIn = p.at;
-      } else if (p.type == 'out') {
-        if (openIn != null && p.at.isAfter(openIn)) {
-          minutes += p.at.difference(openIn).inMinutes;
-          openIn = null;
-        }
-      }
-    }
-    return minutes;
-  }
-
-  int _ordinaryMinutes(int workedMinutes) {
-    if (workedMinutes <= 0) return 0;
-    return workedMinutes > ordinaryDailyMinutes
-        ? ordinaryDailyMinutes
-        : workedMinutes;
-  }
-
-  int _extraMinutes(int workedMinutes) {
-    if (workedMinutes <= ordinaryDailyMinutes) return 0;
-    return workedMinutes - ordinaryDailyMinutes;
-  }
-
-  String _formatMinutes(int minutes) {
-    final h = minutes ~/ 60;
-    final m = minutes % 60;
-    return '${h}h ${m.toString().padLeft(2, '0')}m';
-  }
-
-  String _sanitizeFilePart(String value) {
-    final cleaned = value
-        .trim()
-        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
-        .replaceAll(RegExp(r'\s+'), '_');
-
-    return cleaned.isEmpty ? 'trabajador' : cleaned;
-  }
-
-  String _buildPdfFilename() {
-    final rawName = (employeeLabel ?? widget.employeeId).trim();
-    final safeName = _sanitizeFilePart(rawName);
-    final monthPart = DateFormat('yyyy_MM').format(selectedMonth);
-
-    return '${safeName}_$monthPart.pdf';
-  }
-
+  /// Genera y descarga un PDF con el historial mensual.
   Future<void> _downloadPdf(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) async {
-    if (mode != 1 || docs.isEmpty) return;
+    if (mode != 1 || docs.isEmpty) {
+      return;
+    }
 
     try {
       final punches = docs.map((d) => d.data()).toList();
+
       final label = (employeeLabel ?? widget.employeeId).trim();
 
       final Uint8List pdfBytes = await ExportService.buildPdfBytes(
@@ -173,7 +182,11 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
         monthLabel: selectedMonth,
       );
 
-      final filename = _buildPdfFilename();
+      final filename = ExportService.buildFilenameForMonth(
+        employeeLabel: label,
+        month: selectedMonth,
+        ext: 'pdf',
+      );
 
       await downloadBytes(
         bytes: pdfBytes,
@@ -182,12 +195,14 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
       );
 
       if (!mounted) return;
+
       AppSnackbar.show(
         context,
         'PDF descargado: $filename',
       );
     } catch (e) {
       if (!mounted) return;
+
       AppSnackbar.show(
         context,
         'Error exportando PDF: $e',
@@ -201,12 +216,19 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
     final start = _rangeStart();
     final end = _rangeEndExclusive();
 
+    /// Consulta de fichajes dentro del rango seleccionado.
     final query = FirebaseFirestore.instance
         .collection('punches')
         .doc(widget.employeeId)
         .collection('items')
-        .where('at', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('at', isLessThan: Timestamp.fromDate(end))
+        .where(
+          'at',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(start),
+        )
+        .where(
+          'at',
+          isLessThan: Timestamp.fromDate(end),
+        )
         .orderBy('at', descending: true);
 
     final title = mode == 0
@@ -216,6 +238,7 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
     return SafeArea(
       child: Column(
         children: [
+          /// Panel superior de filtros.
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -228,7 +251,10 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: 12),
+
+                /// Selector entre vista diaria y mensual.
                 SegmentedButton<int>(
                   segments: const [
                     ButtonSegment(
@@ -243,9 +269,14 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
                     ),
                   ],
                   selected: {mode},
-                  onSelectionChanged: (s) => setState(() => mode = s.first),
+                  onSelectionChanged: (s) {
+                    setState(() => mode = s.first);
+                  },
                 ),
+
                 const SizedBox(height: 10),
+
+                /// Selector de fecha o mes.
                 OutlinedButton.icon(
                   onPressed: mode == 0 ? _pickDay : _pickMonth,
                   icon: const Icon(Icons.filter_alt),
@@ -254,33 +285,59 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
               ],
             ),
           ),
+
           Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            child: StreamBuilder<
+                QuerySnapshot<Map<String, dynamic>>>(
               stream: query.snapshots(),
               builder: (context, snap) {
                 if (snap.hasError) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(12),
-                      child: Text('Error: ${snap.error}'),
+                      child: Text(
+                        'Error: ${snap.error}',
+                      ),
                     ),
                   );
                 }
 
                 if (!snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
                 }
 
                 final docs = snap.data!.docs;
 
                 if (docs.isEmpty) {
                   return const Center(
-                    child: Text('No hay fichajes en este periodo.'),
+                    child: Text(
+                      'No hay fichajes en este periodo.',
+                    ),
                   );
                 }
 
+                final punchMaps =
+                    docs.map((d) => d.data()).toList();
+
+                /// Cálculo centralizado de horas usando WorkTime.
+                final perDayMinutes =
+                    WorkTime.minutesByDay(punchMaps);
+
+                final totalMinutes =
+                    WorkTime.totalMinutes(perDayMinutes);
+
+                final totalOrdinaryMinutes =
+                    WorkTime.totalOrdinaryMinutes(perDayMinutes);
+
+                final totalExtraMinutes =
+                    WorkTime.totalExtraMinutes(perDayMinutes);
+
+                /// Conversión de documentos a objetos internos.
                 final punchesDesc = docs.map((d) {
                   final data = d.data();
+
                   final ts = data['at'] as Timestamp?;
 
                   return _Punch(
@@ -292,49 +349,19 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
                   );
                 }).toList();
 
-                final punchesAsc = List<_Punch>.from(punchesDesc)
-                  ..sort((a, b) => a.at.compareTo(b.at));
-
-                final perDayMinutes = <DateTime, int>{};
-                int totalMinutes;
-
-                if (mode == 1) {
-                  final grouped = <DateTime, List<_Punch>>{};
-
-                  for (final p in punchesAsc) {
-                    final dayKey = DateTime(p.at.year, p.at.month, p.at.day);
-                    grouped.putIfAbsent(dayKey, () => []).add(p);
-                  }
-
-                  grouped.forEach((day, list) {
-                    list.sort((a, b) => a.at.compareTo(b.at));
-                    perDayMinutes[day] = _workedMinutes(list);
-                  });
-
-                  totalMinutes =
-                      perDayMinutes.values.fold<int>(0, (a, b) => a + b);
-                } else {
-                  totalMinutes = _workedMinutes(punchesAsc);
-                }
-
-                final totalOrdinaryMinutes = mode == 0
-                    ? _ordinaryMinutes(totalMinutes)
-                    : perDayMinutes.values
-                        .fold<int>(0, (sum, day) => sum + _ordinaryMinutes(day));
-
-                final totalExtraMinutes = mode == 0
-                    ? _extraMinutes(totalMinutes)
-                    : perDayMinutes.values
-                        .fold<int>(0, (sum, day) => sum + _extraMinutes(day));
-
-                final sortedEntries = perDayMinutes.entries.toList()
-                  ..sort((a, b) => b.key.compareTo(a.key));
+                /// Ordena el resumen diario.
+                final sortedEntries =
+                    perDayMinutes.entries.toList()
+                      ..sort(
+                        (a, b) => b.key.compareTo(a.key),
+                      );
 
                 final canExport = mode == 1 && docs.isNotEmpty;
 
                 return ListView(
                   padding: const EdgeInsets.all(12),
                   children: [
+                    /// Tarjeta resumen de horas trabajadas.
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
@@ -346,21 +373,30 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
                           children: [
                             Text(
                               'Total trabajado (${mode == 0 ? "día" : "mes"})',
-                              style: Theme.of(context).textTheme.titleMedium,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium,
                             ),
+
                             const SizedBox(height: 6),
+
                             Text(
-                              _formatMinutes(totalMinutes),
-                              style: Theme.of(context).textTheme.bodyLarge,
+                              WorkTime.formatHM(totalMinutes),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge,
                             ),
+
                             const SizedBox(height: 10),
+
                             Text(
-                              'Ordinarias: ${_formatMinutes(totalOrdinaryMinutes)}',
+                              'Ordinarias: ${WorkTime.formatHM(totalOrdinaryMinutes)}',
                             ),
+
                             if (totalExtraMinutes > 0) ...[
                               const SizedBox(height: 4),
                               Text(
-                                'Extras: ${_formatMinutes(totalExtraMinutes)}',
+                                'Extras: ${WorkTime.formatHM(totalExtraMinutes)}',
                                 style: const TextStyle(
                                   color: Colors.orange,
                                   fontWeight: FontWeight.w600,
@@ -371,17 +407,24 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
                         ),
                       ),
                     ),
+
                     const SizedBox(height: 10),
+
+                    /// Botón para descargar PDF.
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: canExport ? () => _downloadPdf(docs) : null,
+                        onPressed:
+                            canExport ? () => _downloadPdf(docs) : null,
                         icon: const Icon(Icons.picture_as_pdf),
                         label: const Text('Descargar PDF'),
                       ),
                     ),
+
+                    /// Resumen diario en modo mensual.
                     if (mode == 1) ...[
                       const SizedBox(height: 14),
+
                       const Text(
                         'Resumen diario',
                         style: TextStyle(
@@ -389,10 +432,15 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+
                       const SizedBox(height: 6),
+
                       ...sortedEntries.map((entry) {
-                        final ordinary = _ordinaryMinutes(entry.value);
-                        final extra = _extraMinutes(entry.value);
+                        final ordinary =
+                            WorkTime.ordinaryMinutes(entry.value);
+
+                        final extra =
+                            WorkTime.extraMinutes(entry.value);
 
                         return Card(
                           child: Padding(
@@ -401,7 +449,8 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
                               vertical: 12,
                             ),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
@@ -417,18 +466,23 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
                                     ),
                                   ],
                                 ),
+
                                 const SizedBox(height: 8),
+
                                 Text(
-                                  'Total trabajado: ${_formatMinutes(entry.value)}',
+                                  'Total trabajado: ${WorkTime.formatHM(entry.value)}',
                                 ),
+
                                 const SizedBox(height: 4),
+
                                 Text(
-                                  'Ordinarias: ${_formatMinutes(ordinary)}',
+                                  'Ordinarias: ${WorkTime.formatHM(ordinary)}',
                                 ),
+
                                 if (extra > 0) ...[
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Extras: ${_formatMinutes(extra)}',
+                                    'Extras: ${WorkTime.formatHM(extra)}',
                                     style: const TextStyle(
                                       color: Colors.orange,
                                       fontWeight: FontWeight.w600,
@@ -441,7 +495,9 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
                         );
                       }),
                     ],
+
                     const SizedBox(height: 10),
+
                     const Text(
                       'Fichajes',
                       style: TextStyle(
@@ -449,9 +505,13 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+
                     const SizedBox(height: 6),
+
+                    /// Lista detallada de fichajes.
                     ...punchesDesc.map((p) {
                       final isIn = p.type == 'in';
+
                       final fromIncident = p.source == 'incident';
 
                       String title = isIn ? 'Entrada' : 'Salida';
@@ -462,7 +522,9 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
 
                       return Card(
                         child: ListTile(
-                          leading: Icon(isIn ? Icons.login : Icons.logout),
+                          leading: Icon(
+                            isIn ? Icons.login : Icons.logout,
+                          ),
                           title: Text(title),
                           subtitle: Text(
                             '${dfDay.format(p.at)} · ${dfTime.format(p.at)}',
@@ -487,11 +549,23 @@ class _PunchesHistoryPageState extends State<PunchesHistoryPage> {
   }
 }
 
+/// Modelo interno utilizado para representar un fichaje.
 class _Punch {
+  /// Identificador del fichaje.
   final String id;
+
+  /// Tipo de fichaje:
+  /// - in
+  /// - out
   final String type;
+
+  /// Fecha y hora del fichaje.
   final DateTime at;
+
+  /// Indica si el fichaje aún no se ha sincronizado.
   final bool pendingSync;
+
+  /// Origen del fichaje.
   final String source;
 
   _Punch({

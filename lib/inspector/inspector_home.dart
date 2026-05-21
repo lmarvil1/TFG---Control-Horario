@@ -8,21 +8,36 @@ import '../admin/admin_vacations_page.dart';
 import '../admin/employee_punches_page.dart';
 import '../admin/users_page.dart';
 
+/// Pantalla principal del rol de inspección.
+
+/// Esta vista permite acceder en modo consulta a diferentes funcionalidades
+/// Además, incorpora una validación del acceso de inspección,
+/// permitiendo limitar temporalmente los permisos desde Firestore.
+
 class InspectorHome extends StatelessWidget {
   const InspectorHome({super.key});
 
+  /// Cierra la sesión del usuario autenticado.
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
   }
 
+  /// Comprueba si el acceso de inspección continúa activo.
+  
+  /// El acceso se considera válido cuando:
+  /// - inspectionAccessEnabled es true
+  /// - y la fecha de expiración todavía no ha vencido
+  
   bool _hasActiveInspectionAccess(Map<String, dynamic>? data) {
     final enabled = data?['inspectionAccessEnabled'] as bool? ?? false;
     final until = data?['inspectionAccessUntil'];
 
     if (!enabled) return false;
 
+    // Si no existe fecha límite, el acceso se considera indefinido
     if (until == null) return true;
 
+    // Verificación de expiración del acceso
     if (until is Timestamp) {
       return until.toDate().isAfter(DateTime.now());
     }
@@ -34,6 +49,7 @@ class InspectorHome extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
+    // Control de seguridad ante ausencia de sesión
     if (user == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Sesión cerrada')),
@@ -43,12 +59,15 @@ class InspectorHome extends StatelessWidget {
       );
     }
 
+    // Escucha en tiempo real los permisos del usuario
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .snapshots(),
       builder: (context, snap) {
+
+        // Estado de carga inicial
         if (snap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -58,6 +77,7 @@ class InspectorHome extends StatelessWidget {
         final data = snap.data?.data();
         final hasAccess = _hasActiveInspectionAccess(data);
 
+        // Pantalla mostrada cuando el acceso ha caducado
         if (!hasAccess) {
           return Scaffold(
             appBar: AppBar(
@@ -87,21 +107,27 @@ class InspectorHome extends StatelessWidget {
           );
         }
 
+        // Si el acceso es válido, se muestra el panel principal
         return const _InspectorPanel();
       },
     );
   }
 }
 
+/// Panel principal del rol de inspección.
+/// Contiene los accesos a las distintas secciones de consulta.
 class _InspectorPanel extends StatelessWidget {
   const _InspectorPanel();
 
+  /// Cierra la sesión del usuario autenticado.
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
   }
 
   @override
   Widget build(BuildContext context) {
+
+    /// Opciones disponibles dentro del panel.
     final items = [
       _InspectorItem(
         title: 'Ver empleados',
@@ -184,26 +210,37 @@ class _InspectorPanel extends StatelessWidget {
           ),
         ],
       ),
+
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+
+            // Adaptación responsive según el tamaño de pantalla
             final isWide = constraints.maxWidth >= 900;
+
             final horizontalPadding = isWide ? 24.0 : 16.0;
             final maxContentWidth = isWide ? 1100.0 : 620.0;
 
             return SingleChildScrollView(
               padding: EdgeInsets.all(horizontalPadding),
+
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     minHeight: constraints.maxHeight - 32,
                   ),
+
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    constraints: BoxConstraints(
+                      maxWidth: maxContentWidth,
+                    ),
+
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 8),
+
+                        // Título principal del panel
                         Text(
                           'Panel de inspección',
                           style: TextStyle(
@@ -211,17 +248,20 @@ class _InspectorPanel extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+
                         const SizedBox(height: 8),
+
+                        // Aviso visual de modo solo lectura
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
+                            color: Colors.orange.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: Colors.orange.withOpacity(0.4),
+                              color: Colors.orange.withValues(alpha:0.4),
                             ),
                           ),
                           child: const Row(
@@ -244,7 +284,10 @@ class _InspectorPanel extends StatelessWidget {
                             ],
                           ),
                         ),
+
                         const SizedBox(height: 8),
+
+                        // Explicación funcional del rol
                         Text(
                           'Inspección de Trabajo tiene acceso remoto y en tiempo real a los registros de jornada en modo solo lectura para la verificación y control del cumplimiento de la legislación laboral.',
                           style: TextStyle(
@@ -252,11 +295,15 @@ class _InspectorPanel extends StatelessWidget {
                             color: Colors.black54,
                           ),
                         ),
+
                         const SizedBox(height: 24),
+
+                        // Diseño en cuadrícula para pantallas grandes
                         if (isWide)
                           GridView.builder(
                             shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
+                            physics:
+                                const NeverScrollableScrollPhysics(),
                             itemCount: items.length,
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
@@ -271,11 +318,15 @@ class _InspectorPanel extends StatelessWidget {
                               );
                             },
                           )
+
+                        // Diseño vertical para móviles
                         else
                           ...items.map(
                             (item) => Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _InspectorDashboardCard(item: item),
+                              padding:
+                                  const EdgeInsets.only(bottom: 10),
+                              child:
+                                  _InspectorDashboardCard(item: item),
                             ),
                           ),
                       ],
@@ -291,6 +342,7 @@ class _InspectorPanel extends StatelessWidget {
   }
 }
 
+/// Modelo auxiliar que representa una opción del panel.
 class _InspectorItem {
   final String title;
   final String subtitle;
@@ -305,6 +357,7 @@ class _InspectorItem {
   });
 }
 
+/// Tarjeta visual utilizada en el panel de inspección.
 class _InspectorDashboardCard extends StatelessWidget {
   final _InspectorItem item;
 
@@ -320,17 +373,25 @@ class _InspectorDashboardCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
       ),
+
       child: InkWell(
         onTap: item.onTap,
+
         child: Padding(
           padding: const EdgeInsets.all(14),
+
           child: Row(
             children: [
+
+              // Icono representativo
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha:0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -339,11 +400,15 @@ class _InspectorDashboardCard extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
+
               const SizedBox(width: 14),
+
+              // Información textual
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
                     Text(
                       item.title,
@@ -354,7 +419,9 @@ class _InspectorDashboardCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+
                     const SizedBox(height: 4),
+
                     Text(
                       item.subtitle,
                       maxLines: 2,
@@ -368,7 +435,10 @@ class _InspectorDashboardCard extends StatelessWidget {
                   ],
                 ),
               ),
+
               const SizedBox(width: 6),
+
+              // Indicador visual de navegación
               const Icon(
                 Icons.arrow_forward_ios,
                 size: 16,

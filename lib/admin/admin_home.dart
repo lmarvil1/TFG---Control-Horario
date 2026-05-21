@@ -16,6 +16,10 @@ import 'admin_justifications_page.dart';
 import 'admin_payrolls_page.dart';
 import '../worker/worker_home.dart';
 
+/// Pantalla principal del panel de administración.
+
+/// Desde aquí el administrador puede acceder
+/// a todas las funciones principales del sistema.
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
 
@@ -24,26 +28,37 @@ class AdminHome extends StatefulWidget {
 }
 
 class _AdminHomeState extends State<AdminHome> {
+  /// Repositorio encargado de gestionar las notificaciones.
   final NotificationsRepository _notificationsRepo = NotificationsRepository();
+
+  /// Evita mostrar varias veces las notificaciones iniciales.
   bool _startupNotificationsShown = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
+    // Muestra las notificaciones pendientes
+    // una única vez al iniciar la pantalla.
     if (!_startupNotificationsShown) {
       _startupNotificationsShown = true;
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showStartupSnackbars();
       });
     }
   }
 
+  /// Muestra mensajes rápidos con las últimas notificaciones sin leer.
   Future<void> _showStartupSnackbars() async {
     try {
+      // Obtiene un máximo de 3 notificaciones pendientes.
       final unread = await _notificationsRepo.fetchUnreadForStartup(limit: 3);
+
       if (!mounted || unread.isEmpty) return;
 
+      // Si hay más de 3 notificaciones,
+      // se muestra únicamente un resumen.
       if (unread.length > 3) {
         AppSnackbar.show(
           context,
@@ -52,23 +67,29 @@ class _AdminHomeState extends State<AdminHome> {
         return;
       }
 
+      // Muestra cada notificación individualmente.
       for (final n in unread) {
         if (!mounted) return;
+
         AppSnackbar.show(
           context,
           '${n.title}: ${n.body}',
         );
+
         await Future.delayed(const Duration(milliseconds: 2300));
       }
     } catch (_) {
-      // No bloqueamos la pantalla si falla esto.
+      // No se bloquea la aplicación si ocurre un error.
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Usuario autenticado actualmente.
     final user = FirebaseAuth.instance.currentUser;
 
+    /// Stream que escucha cambios en el documento
+    /// del usuario administrador en Firestore.
     final Stream<DocumentSnapshot<Map<String, dynamic>>>? userDocStream =
         (user == null)
             ? null
@@ -79,13 +100,20 @@ class _AdminHomeState extends State<AdminHome> {
 
     return Scaffold(
       appBar: AppBar(
+        // Nombre mostrado en la parte superior.
         title: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: userDocStream,
           builder: (context, snap) {
             final data = snap.data?.data();
+
+            // Nombre almacenado en Firestore.
             final name = (data?['name'] as String?)?.trim();
+
+            // Texto mostrado si no existe nombre.
             final displayName =
-                (name != null && name.isNotEmpty) ? name : 'Administrador';
+                (name != null && name.isNotEmpty)
+                    ? name
+                    : 'Administrador';
 
             return Text(
               displayName,
@@ -94,7 +122,9 @@ class _AdminHomeState extends State<AdminHome> {
             );
           },
         ),
+
         actions: [
+          /// Botón para acceder a la vista de trabajador.
           IconButton(
             tooltip: 'Vista trabajador',
             icon: const Icon(Icons.switch_account),
@@ -102,11 +132,15 @@ class _AdminHomeState extends State<AdminHome> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const WorkerHome(launchedFromAdmin: true),
+                  builder: (_) => const WorkerHome(
+                    launchedFromAdmin: true,
+                  ),
                 ),
               );
             },
           ),
+
+          /// Icono de notificaciones con contador dinámico.
           StreamBuilder<int>(
             stream: _notificationsRepo.streamUnreadCount(),
             builder: (context, snap) {
@@ -127,6 +161,8 @@ class _AdminHomeState extends State<AdminHome> {
                       );
                     },
                   ),
+
+                  // Contador rojo de notificaciones sin leer.
                   if (unreadCount > 0)
                     Positioned(
                       right: 8,
@@ -139,7 +175,9 @@ class _AdminHomeState extends State<AdminHome> {
                         decoration: const BoxDecoration(
                           color: Colors.red,
                           shape: BoxShape.rectangle,
-                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                          borderRadius: BorderRadius.all(
+                            Radius.circular(10),
+                          ),
                         ),
                         constraints: const BoxConstraints(
                           minWidth: 18,
@@ -160,6 +198,8 @@ class _AdminHomeState extends State<AdminHome> {
               );
             },
           ),
+
+          /// Botón para cerrar sesión.
           IconButton(
             tooltip: 'Cerrar sesión',
             icon: const Icon(Icons.logout),
@@ -169,13 +209,21 @@ class _AdminHomeState extends State<AdminHome> {
           ),
         ],
       ),
+
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            /// Detecta si la pantalla es ancha
+            /// para adaptar el diseño.
             final isWide = constraints.maxWidth >= 900;
+
+            /// Espaciado horizontal adaptable.
             final horizontalPadding = isWide ? 24.0 : 16.0;
+
+            /// Anchura máxima del contenido.
             final maxContentWidth = isWide ? 1100.0 : 620.0;
 
+            /// Lista de accesos rápidos del panel administrador.
             final items = [
               _AdminActionItem(
                 title: 'Gestionar empleados',
@@ -184,10 +232,13 @@ class _AdminHomeState extends State<AdminHome> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const UsersPage()),
+                    MaterialPageRoute(
+                      builder: (_) => const UsersPage(),
+                    ),
                   );
                 },
               ),
+
               _AdminActionItem(
                 title: 'Usuarios y roles',
                 subtitle: 'Vincular empleados y asignar permisos',
@@ -201,6 +252,7 @@ class _AdminHomeState extends State<AdminHome> {
                   );
                 },
               ),
+
               _AdminActionItem(
                 title: 'Ver fichajes por empleado',
                 subtitle: 'Consultar historial y exportaciones',
@@ -214,6 +266,7 @@ class _AdminHomeState extends State<AdminHome> {
                   );
                 },
               ),
+
               _AdminActionItem(
                 title: 'Gestionar incidencias',
                 subtitle: 'Aprobar, rechazar y revisar incidencias',
@@ -227,6 +280,7 @@ class _AdminHomeState extends State<AdminHome> {
                   );
                 },
               ),
+
               _AdminActionItem(
                 title: 'Gestionar vacaciones',
                 subtitle: 'Solicitudes, aprobación y calendario',
@@ -240,9 +294,11 @@ class _AdminHomeState extends State<AdminHome> {
                   );
                 },
               ),
+
               _AdminActionItem(
                 title: 'Gestionar justificantes',
-                subtitle: 'Revisar justificantes subidos por los empleados',
+                subtitle:
+                    'Revisar justificantes subidos por los empleados',
                 icon: Icons.description,
                 onTap: () {
                   Navigator.push(
@@ -253,6 +309,7 @@ class _AdminHomeState extends State<AdminHome> {
                   );
                 },
               ),
+
               _AdminActionItem(
                 title: 'Gestionar nóminas',
                 subtitle: 'Subir, consultar y descargar nóminas',
@@ -272,15 +329,22 @@ class _AdminHomeState extends State<AdminHome> {
               padding: EdgeInsets.all(horizontalPadding),
               child: Center(
                 child: ConstrainedBox(
-                  constraints:
-                      BoxConstraints(minHeight: constraints.maxHeight - 32),
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 32,
+                  ),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    constraints: BoxConstraints(
+                      maxWidth: maxContentWidth,
+                    ),
+
+                    // Diseño adaptativo según el tamaño de pantalla.
                     child: isWide
                         ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 8),
+
                               const Text(
                                 'Panel de administración',
                                 style: TextStyle(
@@ -288,7 +352,9 @@ class _AdminHomeState extends State<AdminHome> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+
                               const SizedBox(height: 8),
+
                               const Text(
                                 'Accede rápidamente a las funciones principales del sistema.',
                                 style: TextStyle(
@@ -296,10 +362,14 @@ class _AdminHomeState extends State<AdminHome> {
                                   color: Colors.black54,
                                 ),
                               ),
+
                               const SizedBox(height: 24),
+
+                              // Vista en cuadrícula para pantallas grandes.
                               GridView.builder(
                                 shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
+                                physics:
+                                    const NeverScrollableScrollPhysics(),
                                 itemCount: items.length,
                                 gridDelegate:
                                     const SliverGridDelegateWithFixedCrossAxisCount(
@@ -309,19 +379,28 @@ class _AdminHomeState extends State<AdminHome> {
                                   childAspectRatio: 1.9,
                                 ),
                                 itemBuilder: (context, index) {
-                                  return _AdminDashboardCard(item: items[index]);
+                                  return _AdminDashboardCard(
+                                    item: items[index],
+                                  );
                                 },
                               ),
                             ],
                           )
+
+                        // Vista vertical para móviles.
                         : Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const SizedBox(height: 4),
+
                               ...items.map(
                                 (item) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 14),
-                                  child: _AdminDashboardCard(item: item),
+                                  padding: const EdgeInsets.only(
+                                    bottom: 14,
+                                  ),
+                                  child: _AdminDashboardCard(
+                                    item: item,
+                                  ),
                                 ),
                               ),
                             ],
@@ -337,10 +416,19 @@ class _AdminHomeState extends State<AdminHome> {
   }
 }
 
+/// Modelo auxiliar para representar
+/// cada opción del panel de administración.
 class _AdminActionItem {
+  /// Título principal de la opción.
   final String title;
+
+  /// Descripción breve de la funcionalidad.
   final String subtitle;
+
+  /// Icono mostrado en la tarjeta.
   final IconData icon;
+
+  /// Acción ejecutada al pulsar la tarjeta.
   final VoidCallback onTap;
 
   const _AdminActionItem({
@@ -351,7 +439,9 @@ class _AdminActionItem {
   });
 }
 
+/// Tarjeta visual utilizada en el panel administrador.
 class _AdminDashboardCard extends StatelessWidget {
+  /// Información asociada a la tarjeta.
   final _AdminActionItem item;
 
   const _AdminDashboardCard({
@@ -363,33 +453,49 @@ class _AdminDashboardCard extends StatelessWidget {
     return Card(
       elevation: 2,
       clipBehavior: Clip.antiAlias,
+
+      // Bordes redondeados de la tarjeta.
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
       ),
+
       child: InkWell(
         onTap: item.onTap,
+
         child: Padding(
           padding: const EdgeInsets.all(20),
+
           child: Row(
             children: [
+              // Contenedor del icono principal.
               Container(
                 width: 68,
                 height: 68,
+
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.12),
+
                   borderRadius: BorderRadius.circular(16),
                 ),
+
                 child: Icon(
                   item.icon,
                   size: 34,
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
+
               const SizedBox(width: 18),
+
+              // Información textual de la tarjeta.
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
                     Text(
                       item.title,
@@ -400,7 +506,9 @@ class _AdminDashboardCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+
                     const SizedBox(height: 6),
+
                     Text(
                       item.subtitle,
                       maxLines: 3,
@@ -414,7 +522,10 @@ class _AdminDashboardCard extends StatelessWidget {
                   ],
                 ),
               ),
+
               const SizedBox(width: 8),
+
+              // Flecha decorativa lateral.
               const Icon(
                 Icons.arrow_forward_ios,
                 size: 18,

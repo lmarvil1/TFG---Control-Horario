@@ -9,38 +9,61 @@ import '../data/models/repositories/punches_repository.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/export_service.dart';
 import '../utils/file_downloader.dart';
+import '../utils/work_time.dart';
 
+/// Pantalla para consultar los fichajes de empleados.
+
+/// Permite visualizar registros diarios y mensuales,
+/// además de exportarlos en CSV y PDF.
 class EmployeePunchesPage extends StatefulWidget {
   const EmployeePunchesPage({super.key});
 
   @override
-  State<EmployeePunchesPage> createState() => _EmployeePunchesPageState();
+  State<EmployeePunchesPage> createState() =>
+      _EmployeePunchesPageState();
 }
 
-class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
+class _EmployeePunchesPageState
+    extends State<EmployeePunchesPage> {
+  /// ID del empleado seleccionado.
   String? selectedEmployeeId;
+
+  /// Nombre del empleado seleccionado.
   String? selectedEmployeeLabel;
 
+  /// Repositorio encargado de obtener fichajes.
   final punchesRepo = PunchesRepository();
 
+  /// Formato de fecha.
   final dfDay = DateFormat('dd/MM/yyyy');
+
+  /// Formato de hora.
   final dfTime = DateFormat('HH:mm');
 
-  /// 0 = Día | 1 = Mes
+  /// Modo actual:
+  /// 0 = Día
+  /// 1 = Mes
   int mode = 0;
 
+  /// Día seleccionado actualmente.
   DateTime selectedDay = DateTime.now();
+
+  /// Mes seleccionado actualmente.
   DateTime selectedMonth =
       DateTime(DateTime.now().year, DateTime.now().month, 1);
 
+  /// Todos los fichajes descargados.
   List<_PunchItem> allPunches = [];
+
+  /// Fichajes filtrados según el periodo seleccionado.
   List<_PunchItem> currentFiltered = [];
 
-  static const int ordinaryDailyMinutes = 480; // 8 horas
-
+  /// Devuelve los fichajes filtrados
+  /// convertidos a lista de mapas.
   List<Map<String, dynamic>> get _currentFilteredData =>
       currentFiltered.map((e) => e.data).toList();
 
+  /// Selector de día.
   Future<void> _pickDay() async {
     final d = await showDatePicker(
       context: context,
@@ -49,11 +72,19 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
       firstDate: DateTime(2020, 1, 1),
       lastDate: DateTime.now(),
     );
+
     if (d != null) {
-      setState(() => selectedDay = DateTime(d.year, d.month, d.day));
+      setState(() {
+        selectedDay = DateTime(
+          d.year,
+          d.month,
+          d.day,
+        );
+      });
     }
   }
 
+  /// Selector de mes.
   Future<void> _pickMonth() async {
     final d = await showDatePicker(
       context: context,
@@ -62,111 +93,127 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
       firstDate: DateTime(2020, 1, 1),
       lastDate: DateTime.now(),
     );
+
     if (d != null) {
-      setState(() => selectedMonth = DateTime(d.year, d.month, 1));
+      setState(() {
+        selectedMonth = DateTime(
+          d.year,
+          d.month,
+          1,
+        );
+      });
     }
   }
 
+  /// Fecha inicial del filtro.
   DateTime _rangeStart() {
     if (mode == 0) {
-      return DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
+      return DateTime(
+        selectedDay.year,
+        selectedDay.month,
+        selectedDay.day,
+      );
     }
-    return DateTime(selectedMonth.year, selectedMonth.month, 1);
+
+    return DateTime(
+      selectedMonth.year,
+      selectedMonth.month,
+      1,
+    );
   }
 
+  /// Fecha final exclusiva del filtro.
   DateTime _rangeEndExclusive() {
-    if (mode == 0) return _rangeStart().add(const Duration(days: 1));
+    if (mode == 0) {
+      return _rangeStart().add(
+        const Duration(days: 1),
+      );
+    }
 
-    final start = DateTime(selectedMonth.year, selectedMonth.month, 1);
+    final start = DateTime(
+      selectedMonth.year,
+      selectedMonth.month,
+      1,
+    );
+
     return (start.month == 12)
         ? DateTime(start.year + 1, 1, 1)
         : DateTime(start.year, start.month + 1, 1);
   }
 
+  /// Filtra los fichajes según el rango seleccionado.
   void _applyFilter() {
     final start = _rangeStart();
     final end = _rangeEndExclusive();
 
     final out = allPunches.where((p) {
       final at = p.at;
+
       if (at == null) return false;
+
       return !at.isBefore(start) && at.isBefore(end);
     }).toList()
+
+      // Orden descendente por fecha.
       ..sort((a, b) {
-        final aTime = a.at ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bTime = b.at ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final aTime =
+            a.at ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+        final bTime =
+            b.at ?? DateTime.fromMillisecondsSinceEpoch(0);
+
         return bTime.compareTo(aTime);
       });
 
     currentFiltered = out;
   }
 
-  int _workedMinutes(List<Map<String, dynamic>> punches) {
-    int minutes = 0;
-    DateTime? openIn;
-
-    for (final p in punches) {
-      final ts = p['at'];
-      if (ts is! Timestamp) continue;
-      final at = ts.toDate();
-
-      final type = (p['type'] ?? '').toString();
-      if (type == 'in') {
-        openIn = at;
-      } else if (type == 'out') {
-        if (openIn != null && at.isAfter(openIn)) {
-          minutes += at.difference(openIn).inMinutes;
-          openIn = null;
-        }
-      }
-    }
-    return minutes;
-  }
-
-  int _ordinaryMinutes(int workedMinutes) {
-    if (workedMinutes <= 0) return 0;
-    return workedMinutes > ordinaryDailyMinutes
-        ? ordinaryDailyMinutes
-        : workedMinutes;
-  }
-
-  int _extraMinutes(int workedMinutes) {
-    if (workedMinutes <= ordinaryDailyMinutes) return 0;
-    return workedMinutes - ordinaryDailyMinutes;
-  }
-
-  String _formatMinutes(int minutes) {
-    final h = minutes ~/ 60;
-    final m = minutes % 60;
-    return '${h}h ${m.toString().padLeft(2, '0')}m';
-  }
-
+  /// Texto descriptivo del periodo seleccionado.
   String _titleLabel() {
     return mode == 0
         ? 'Día: ${dfDay.format(selectedDay)}'
         : 'Mes: ${DateFormat('MM/yyyy').format(selectedMonth)}';
   }
 
-  Future<void> _openMaps(double lat, double lng) async {
-    final uri =
-        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  /// Abre la ubicación del fichaje en Google Maps.
+  Future<void> _openMaps(
+    double lat,
+    double lng,
+  ) async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+    );
+
+    await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
   }
 
+  /// Descarga los fichajes en CSV.
   Future<void> _downloadCsv() async {
     if (selectedEmployeeId == null) return;
     if (mode != 1) return;
     if (_currentFilteredData.isEmpty) return;
 
     try {
-      final Uint8List bytes = ExportService.buildCsvBytes(_currentFilteredData);
+      // Genera los bytes del CSV.
+      final Uint8List bytes =
+          ExportService.buildCsvBytes(
+        _currentFilteredData,
+      );
 
-      final filename = ExportService.buildFilenameForMonth(
-        employeeLabel: selectedEmployeeLabel ?? selectedEmployeeId!,
+      // Nombre del archivo.
+      final filename =
+          ExportService.buildFilenameForMonth(
+        employeeLabel:
+            selectedEmployeeLabel ??
+            selectedEmployeeId!,
         month: selectedMonth,
         ext: 'csv',
       );
 
+      // Descarga del archivo.
       await downloadBytes(
         bytes: bytes,
         filename: filename,
@@ -174,12 +221,14 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
       );
 
       if (!mounted) return;
+
       AppSnackbar.show(
         context,
         'CSV descargado (${_currentFilteredData.length} registros).',
       );
     } catch (e) {
       if (!mounted) return;
+
       AppSnackbar.show(
         context,
         'Error exportando CSV: $e',
@@ -188,25 +237,37 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
     }
   }
 
+  /// Descarga los fichajes en PDF.
   Future<void> _downloadPdf() async {
     if (selectedEmployeeId == null) return;
     if (mode != 1) return;
     if (_currentFilteredData.isEmpty) return;
 
     try {
-      final Uint8List pdfBytes = await ExportService.buildPdfBytes(
+      // Genera el PDF.
+      final Uint8List pdfBytes =
+          await ExportService.buildPdfBytes(
         punches: _currentFilteredData,
-        employeeLabel: selectedEmployeeLabel ?? selectedEmployeeId!,
+
+        employeeLabel:
+            selectedEmployeeLabel ??
+            selectedEmployeeId!,
+
         downloadNow: DateTime.now(),
         monthLabel: selectedMonth,
       );
 
-      final filename = ExportService.buildFilenameForMonth(
-        employeeLabel: selectedEmployeeLabel ?? selectedEmployeeId!,
+      // Nombre del archivo.
+      final filename =
+          ExportService.buildFilenameForMonth(
+        employeeLabel:
+            selectedEmployeeLabel ??
+            selectedEmployeeId!,
         month: selectedMonth,
         ext: 'pdf',
       );
 
+      // Descarga del archivo.
       await downloadBytes(
         bytes: pdfBytes,
         filename: filename,
@@ -214,12 +275,14 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
       );
 
       if (!mounted) return;
+
       AppSnackbar.show(
         context,
         'PDF descargado (${_currentFilteredData.length} registros).',
       );
     } catch (e) {
       if (!mounted) return;
+
       AppSnackbar.show(
         context,
         'Error exportando PDF: $e',
@@ -230,18 +293,27 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final employeesStream = FirebaseFirestore.instance
+    /// Stream de empleados.
+    final employeesStream = FirebaseFirestore
+        .instance
         .collection('employees')
         .orderBy('createdAt', descending: true)
         .snapshots();
 
+    /// Indica si se permite exportar.
     final canExport =
-        selectedEmployeeId != null && mode == 1 && _currentFilteredData.isNotEmpty;
+        selectedEmployeeId != null &&
+        mode == 1 &&
+        _currentFilteredData.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fichajes por empleado'),
+        title: const Text(
+          'Fichajes por empleado',
+        ),
+
         actions: [
+          /// Botón descarga CSV.
           IconButton(
             tooltip: mode == 1
                 ? 'Descargar CSV'
@@ -249,6 +321,8 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
             onPressed: canExport ? _downloadCsv : null,
             icon: const Icon(Icons.table_view),
           ),
+
+          /// Botón descarga PDF.
           IconButton(
             tooltip: mode == 1
                 ? 'Descargar PDF'
@@ -258,18 +332,24 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
           ),
         ],
       ),
+
       body: Column(
         children: [
+          /// Selector de empleado.
           Padding(
             padding: const EdgeInsets.all(12),
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            child: StreamBuilder<
+                QuerySnapshot<Map<String, dynamic>>>(
               stream: employeesStream,
               builder: (context, snap) {
-                if (!snap.hasData) return const LinearProgressIndicator();
+                if (!snap.hasData) {
+                  return const LinearProgressIndicator();
+                }
+
                 final docs = snap.data!.docs;
 
                 return DropdownButtonFormField<String>(
-                  value: selectedEmployeeId,
+                  initialValue: selectedEmployeeId,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Selecciona empleado',
@@ -277,7 +357,9 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                   ),
                   items: docs.map((d) {
                     final data = d.data();
+
                     final label = "${data['name']}";
+
                     return DropdownMenuItem(
                       value: d.id,
                       child: Text(
@@ -290,17 +372,29 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                   onChanged: (v) {
                     if (v == null) return;
 
-                    final doc = docs.firstWhere((d) => d.id == v);
+                    final doc = docs.firstWhere(
+                      (d) => d.id == v,
+                    );
+
                     final data = doc.data();
-                    final label = (data['name'] ?? '').toString();
+
+                    final label =
+                        (data['name'] ?? '').toString();
 
                     setState(() {
                       selectedEmployeeId = v;
                       selectedEmployeeLabel = label;
+
                       mode = 0;
+
                       selectedDay = DateTime.now();
-                      selectedMonth =
-                          DateTime(DateTime.now().year, DateTime.now().month, 1);
+
+                      selectedMonth = DateTime(
+                        DateTime.now().year,
+                        DateTime.now().month,
+                        1,
+                      );
+
                       allPunches = [];
                       currentFiltered = [];
                     });
@@ -309,20 +403,31 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
               },
             ),
           ),
+
+          /// Mensaje inicial si no hay empleado seleccionado.
           if (selectedEmployeeId == null)
             const Expanded(
-              child: Center(child: Text('Selecciona un empleado')),
+              child: Center(
+                child: Text(
+                  'Selecciona un empleado',
+                ),
+              ),
             )
           else
             Expanded(
               child: Column(
                 children: [
+                  /// Controles de filtros.
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment:
+                          CrossAxisAlignment.stretch,
                       children: [
+                        /// Selector Día / Mes.
                         SegmentedButton<int>(
                           segments: const [
                             ButtonSegment(
@@ -333,24 +438,40 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                             ButtonSegment(
                               value: 1,
                               label: Text('Mes'),
-                              icon: Icon(Icons.calendar_month),
+                              icon: Icon(
+                                Icons.calendar_month,
+                              ),
                             ),
                           ],
                           selected: {mode},
-                          onSelectionChanged: (s) =>
-                              setState(() => mode = s.first),
+                          onSelectionChanged: (s) {
+                            setState(() {
+                              mode = s.first;
+                            });
+                          },
                         ),
+
                         const SizedBox(height: 10),
+
+                        /// Selector de fecha.
                         OutlinedButton.icon(
-                          onPressed: mode == 0 ? _pickDay : _pickMonth,
-                          icon: const Icon(Icons.filter_alt),
-                          label: Text(_titleLabel()),
+                          onPressed:
+                              mode == 0 ? _pickDay : _pickMonth,
+                          icon: const Icon(
+                            Icons.filter_alt,
+                          ),
+                          label: Text(
+                            _titleLabel(),
+                          ),
                         ),
                       ],
                     ),
                   ),
+
+                  /// Lista de fichajes.
                   Expanded(
-                    child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    child: StreamBuilder<
+                        QuerySnapshot<Map<String, dynamic>>>(
                       stream: punchesRepo.streamPunches(
                         selectedEmployeeId!,
                         includeMetadata: true,
@@ -359,8 +480,12 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                         if (snap.hasError) {
                           return Center(
                             child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Text('Error: ${snap.error}'),
+                              padding: const EdgeInsets.all(
+                                12,
+                              ),
+                              child: Text(
+                                'Error: ${snap.error}',
+                              ),
                             ),
                           );
                         }
@@ -373,106 +498,105 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
 
                         final docs = snap.data!.docs;
 
+                        /// Conversión de documentos.
                         allPunches = docs.map((d) {
                           return _PunchItem(
                             data: d.data(),
-                            pendingSync: d.metadata.hasPendingWrites,
+                            pendingSync:
+                                d.metadata.hasPendingWrites,
                           );
                         }).toList();
 
+                        // Aplicación del filtro.
                         _applyFilter();
 
-                        final ascForCalc = List<_PunchItem>.from(currentFiltered)
-                          ..sort((a, b) {
-                            final aTime =
-                                a.at ?? DateTime.fromMillisecondsSinceEpoch(0);
-                            final bTime =
-                                b.at ?? DateTime.fromMillisecondsSinceEpoch(0);
-                            return aTime.compareTo(bTime);
-                          });
+                        final calcData =
+                            _currentFilteredData.toList();
 
-                        final ascCalcData = ascForCalc.map((e) => e.data).toList();
+                        /// Minutos trabajados por día.
+                        final perDayMinutes =
+                            WorkTime.minutesByDay(calcData);
 
-                        final perDayMinutes = <DateTime, int>{};
-                        int totalMinutes;
+                        final totalMinutes =
+                            WorkTime.totalMinutes(perDayMinutes);
 
-                        if (mode == 1) {
-                          final grouped = <DateTime, List<Map<String, dynamic>>>{};
+                        /// Minutos ordinarios totales.
+                        final totalOrdinaryMinutes =
+                            WorkTime.totalOrdinaryMinutes(
+                          perDayMinutes,
+                        );
 
-                          for (final p in ascCalcData) {
-                            final ts = p['at'] as Timestamp?;
-                            final at = ts?.toDate();
-                            if (at == null) continue;
-                            final dayKey = DateTime(at.year, at.month, at.day);
-                            grouped.putIfAbsent(dayKey, () => []).add(p);
-                          }
+                        /// Minutos extra totales.
+                        final totalExtraMinutes =
+                            WorkTime.totalExtraMinutes(
+                          perDayMinutes,
+                        );
 
-                          grouped.forEach((day, list) {
-                            list.sort((a, b) {
-                              final aTime = (a['at'] as Timestamp).toDate();
-                              final bTime = (b['at'] as Timestamp).toDate();
-                              return aTime.compareTo(bTime);
-                            });
-                            perDayMinutes[day] = _workedMinutes(list);
-                          });
-
-                          totalMinutes =
-                              perDayMinutes.values.fold<int>(0, (a, b) => a + b);
-                        } else {
-                          totalMinutes = _workedMinutes(ascCalcData);
-                        }
-
-                        final totalOrdinaryMinutes = mode == 0
-                            ? _ordinaryMinutes(totalMinutes)
-                            : perDayMinutes.values.fold<int>(
-                                0,
-                                (sum, day) => sum + _ordinaryMinutes(day),
+                        /// Resumen ordenado por día.
+                        final sortedEntries =
+                            perDayMinutes.entries.toList()
+                              ..sort(
+                                (a, b) => b.key.compareTo(
+                                  a.key,
+                                ),
                               );
-
-                        final totalExtraMinutes = mode == 0
-                            ? _extraMinutes(totalMinutes)
-                            : perDayMinutes.values.fold<int>(
-                                0,
-                                (sum, day) => sum + _extraMinutes(day),
-                              );
-
-                        final sortedEntries = perDayMinutes.entries.toList()
-                          ..sort((a, b) => b.key.compareTo(a.key));
 
                         return ListView(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(
+                            12,
+                          ),
                           children: [
+                            /// Tarjeta resumen principal.
                             Card(
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(
+                                padding:
+                                    const EdgeInsets.symmetric(
                                   horizontal: 16,
                                   vertical: 14,
                                 ),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       'Total trabajado (${mode == 0 ? "día" : "mes"})',
-                                      style:
-                                          Theme.of(context).textTheme.titleMedium,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium,
                                     ),
-                                    const SizedBox(height: 6),
+
+                                    const SizedBox(
+                                      height: 6,
+                                    ),
+
                                     Text(
-                                      _formatMinutes(totalMinutes),
-                                      style:
-                                          Theme.of(context).textTheme.bodyLarge,
+                                      WorkTime.formatHM(
+                                        totalMinutes,
+                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge,
                                     ),
-                                    const SizedBox(height: 10),
+
+                                    const SizedBox(
+                                      height: 10,
+                                    ),
+
                                     Text(
-                                      'Ordinarias: ${_formatMinutes(totalOrdinaryMinutes)}',
+                                      'Ordinarias: ${WorkTime.formatHM(totalOrdinaryMinutes)}',
                                     ),
+
                                     if (totalExtraMinutes > 0) ...[
-                                      const SizedBox(height: 4),
+                                      const SizedBox(
+                                        height: 4,
+                                      ),
                                       Text(
-                                        'Extras: ${_formatMinutes(totalExtraMinutes)}',
-                                        style: const TextStyle(
+                                        'Extras: ${WorkTime.formatHM(totalExtraMinutes)}',
+                                        style:
+                                            const TextStyle(
                                           color: Colors.orange,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight:
+                                              FontWeight.w600,
                                         ),
                                       ),
                                     ],
@@ -480,8 +604,11 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                                 ),
                               ),
                             ),
+
+                            /// Resumen diario mensual.
                             if (mode == 1) ...[
                               const SizedBox(height: 14),
+
                               const Text(
                                 'Resumen diario',
                                 style: TextStyle(
@@ -489,20 +616,34 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
+
                               const SizedBox(height: 6),
+
                               if (sortedEntries.isEmpty)
                                 const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 12),
-                                  child: Text('No hay fichajes en este mes.'),
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  child: Text(
+                                    'No hay fichajes en este mes.',
+                                  ),
                                 )
                               else
                                 ...sortedEntries.map((e) {
-                                  final ordinary = _ordinaryMinutes(e.value);
-                                  final extra = _extraMinutes(e.value);
+                                  final ordinary =
+                                      WorkTime.ordinaryMinutes(
+                                    e.value,
+                                  );
+
+                                  final extra =
+                                      WorkTime.extraMinutes(
+                                    e.value,
+                                  );
 
                                   return Card(
                                     child: Padding(
-                                      padding: const EdgeInsets.symmetric(
+                                      padding:
+                                          const EdgeInsets.symmetric(
                                         horizontal: 16,
                                         vertical: 12,
                                       ),
@@ -510,35 +651,59 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
+                                          /// Cabecera del día.
                                           Row(
                                             children: [
-                                              const Icon(Icons.today),
-                                              const SizedBox(width: 12),
+                                              const Icon(
+                                                Icons.today,
+                                              ),
+
+                                              const SizedBox(
+                                                width: 12,
+                                              ),
+
                                               Expanded(
                                                 child: Text(
-                                                  dfDay.format(e.key),
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w600,
+                                                  dfDay.format(
+                                                    e.key,
+                                                  ),
+                                                  style:
+                                                      const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w600,
                                                   ),
                                                 ),
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Total trabajado: ${_formatMinutes(e.value)}',
+
+                                          const SizedBox(
+                                            height: 8,
                                           ),
-                                          const SizedBox(height: 4),
+
                                           Text(
-                                            'Ordinarias: ${_formatMinutes(ordinary)}',
+                                            'Total trabajado: ${WorkTime.formatHM(e.value)}',
                                           ),
+
+                                          const SizedBox(
+                                            height: 4,
+                                          ),
+
+                                          Text(
+                                            'Ordinarias: ${WorkTime.formatHM(ordinary)}',
+                                          ),
+
                                           if (extra > 0) ...[
-                                            const SizedBox(height: 4),
+                                            const SizedBox(
+                                              height: 4,
+                                            ),
                                             Text(
-                                              'Extras: ${_formatMinutes(extra)}',
-                                              style: const TextStyle(
+                                              'Extras: ${WorkTime.formatHM(extra)}',
+                                              style:
+                                                  const TextStyle(
                                                 color: Colors.orange,
-                                                fontWeight: FontWeight.w600,
+                                                fontWeight:
+                                                    FontWeight.w600,
                                               ),
                                             ),
                                           ],
@@ -548,7 +713,10 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                                   );
                                 }),
                             ],
+
                             const SizedBox(height: 10),
+
+                            /// Título de fichajes.
                             const Text(
                               'Fichajes',
                               style: TextStyle(
@@ -556,59 +724,102 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
+
                             const SizedBox(height: 6),
+
+                            /// Mensaje sin fichajes.
                             if (currentFiltered.isEmpty)
                               const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 24),
+                                padding: EdgeInsets.symmetric(
+                                  vertical: 24,
+                                ),
                                 child: Center(
-                                  child: Text('No hay fichajes en este periodo.'),
+                                  child: Text(
+                                    'No hay fichajes en este periodo.',
+                                  ),
                                 ),
                               )
                             else
                               ...currentFiltered.map((item) {
-                                final ts = item.data['at'] as Timestamp?;
-                                final at = ts?.toDate() ?? DateTime.now();
-                                final type = (item.data['type'] ?? '').toString();
+                                final ts =
+                                    item.data['at'] as Timestamp?;
+
+                                final at =
+                                    ts?.toDate() ?? DateTime.now();
+
+                                final type =
+                                    (item.data['type'] ?? '')
+                                        .toString();
+
                                 final isIn = type == 'in';
 
                                 final source =
-                                    (item.data['source'] ?? 'mobile').toString();
-                                final fromIncident = source == 'incident';
+                                    (item.data['source'] ?? 'mobile')
+                                        .toString();
 
-                                String title = isIn ? 'Entrada' : 'Salida';
+                                final fromIncident =
+                                    source == 'incident';
+
+                                /// Texto principal.
+                                String title =
+                                    isIn ? 'Entrada' : 'Salida';
+
                                 if (fromIncident) {
-                                  title = '$title (incidencia aprobada)';
+                                  title =
+                                      '$title (incidencia aprobada)';
                                 }
 
+                                /// Ubicación del fichaje.
                                 final loc =
-                                    item.data['location'] as Map<String, dynamic>?;
+                                    item.data['location']
+                                        as Map<String, dynamic>?;
+
                                 final double? lat =
-                                    (loc?['lat'] as num?)?.toDouble();
+                                    (loc?['lat'] as num?)
+                                        ?.toDouble();
+
                                 final double? lng =
-                                    (loc?['lng'] as num?)?.toDouble();
+                                    (loc?['lng'] as num?)
+                                        ?.toDouble();
 
                                 Widget? trailing;
 
+                                /// Botón abrir Maps.
                                 if (lat != null && lng != null) {
                                   trailing = IconButton(
                                     tooltip: 'Abrir en Maps',
-                                    icon: const Icon(Icons.location_on),
-                                    onPressed: () => _openMaps(lat, lng),
+                                    icon: const Icon(
+                                      Icons.location_on,
+                                    ),
+                                    onPressed: () => _openMaps(
+                                      lat,
+                                      lng,
+                                    ),
                                   );
                                 }
 
+                                /// Indicador pendiente sincronización.
                                 if (item.pendingSync) {
-                                  trailing = const Tooltip(
-                                    message: 'Pendiente de sincronizar',
-                                    child: Icon(Icons.cloud_upload),
+                                  trailing =
+                                      const Tooltip(
+                                    message:
+                                        'Pendiente de sincronizar',
+                                    child: Icon(
+                                      Icons.cloud_upload,
+                                    ),
                                   );
                                 }
 
                                 return Card(
                                   child: ListTile(
-                                    leading:
-                                        Icon(isIn ? Icons.login : Icons.logout),
-                                    title: Text(title),
+                                    leading: Icon(
+                                      isIn
+                                          ? Icons.login
+                                          : Icons.logout,
+                                    ),
+                                    title: Text(
+                                      title,
+                                    ),
                                     subtitle: Text(
                                       '${dfDay.format(at)} · ${dfTime.format(at)}',
                                     ),
@@ -630,8 +841,12 @@ class _EmployeePunchesPageState extends State<EmployeePunchesPage> {
   }
 }
 
+/// Modelo auxiliar para representar fichajes.
 class _PunchItem {
+  /// Datos del fichaje.
   final Map<String, dynamic> data;
+
+  /// Indica si el fichaje está pendiente de sincronización.
   final bool pendingSync;
 
   _PunchItem({
@@ -639,9 +854,14 @@ class _PunchItem {
     required this.pendingSync,
   });
 
+  /// Fecha del fichaje.
   DateTime? get at {
     final ts = data['at'];
-    if (ts is Timestamp) return ts.toDate();
+
+    if (ts is Timestamp) {
+      return ts.toDate();
+    }
+
     return null;
   }
 }

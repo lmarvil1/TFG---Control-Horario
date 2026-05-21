@@ -7,21 +7,21 @@ import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 /// Clase que centraliza la configuración de Firebase para cada plataforma.
-///
+
 /// Este archivo es generado automáticamente por FlutterFire CLI y contiene
 /// los parámetros necesarios para conectar la aplicación con el proyecto
 /// de Firebase correspondiente.
-///
+
 /// No se recomienda modificar manualmente este archivo, ya que cualquier
 /// cambio puede sobrescribirse al regenerarlo.
 class DefaultFirebaseOptions {
 
   /// Devuelve la configuración de Firebase adecuada según la plataforma
   /// en la que se esté ejecutando la aplicación.
-  ///
-  /// - Web → configuración específica web
-  /// - Android / iOS / macOS / Windows → configuración nativa correspondiente
-  /// - Linux → no soportado, requiere configuración adicional
+  
+  /// - Web --> configuración específica web
+  /// - Android / iOS / macOS / Windows --> configuración nativa correspondiente
+  /// - Linux --> no soportado, requiere configuración adicional
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
       return web;

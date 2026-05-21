@@ -11,7 +11,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/app_snackbar.dart';
 
+/// Pantalla de gestión de justificantes.
+
+/// Permite consultar, filtrar, abrir y descargar
+/// justificantes subidos por los trabajadores.
 class AdminJustificationsPage extends StatefulWidget {
+
+  /// Indica si la pantalla está en modo solo lectura.
   final bool readOnly;
 
   const AdminJustificationsPage({
@@ -24,43 +30,78 @@ class AdminJustificationsPage extends StatefulWidget {
       _AdminJustificationsPageState();
 }
 
-class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
+class _AdminJustificationsPageState
+    extends State<AdminJustificationsPage> {
+
+  /// Formato de fecha.
   final df = DateFormat('dd/MM/yyyy');
 
+  /// Controlador del buscador.
   final searchCtrl = TextEditingController();
+
+  /// Empleado seleccionado para el filtro.
   String? selectedEmployeeId;
 
+  /// Fecha inicial del filtro.
   DateTime? fromDate;
+
+  /// Fecha final del filtro.
   DateTime? toDate;
 
   @override
   void dispose() {
+
+    // Libera el controlador.
     searchCtrl.dispose();
+
     super.dispose();
   }
 
+  /// Selector de fecha inicial.
   Future<void> _pickFromDate() async {
+
     final picked = await showDatePicker(
       context: context,
       locale: const Locale('es', 'ES'),
-      initialDate: fromDate ?? DateTime.now(),
+
+      initialDate:
+          fromDate ?? DateTime.now(),
+
       firstDate: DateTime(2020),
+
       lastDate: DateTime.now(),
     );
-    if (picked != null) setState(() => fromDate = picked);
+
+    if (picked != null) {
+      setState(() {
+        fromDate = picked;
+      });
+    }
   }
 
+  /// Selector de fecha final.
   Future<void> _pickToDate() async {
+
     final picked = await showDatePicker(
       context: context,
       locale: const Locale('es', 'ES'),
-      initialDate: toDate ?? DateTime.now(),
+
+      initialDate:
+          toDate ?? DateTime.now(),
+
       firstDate: DateTime(2020),
+
       lastDate: DateTime.now(),
     );
-    if (picked != null) setState(() => toDate = picked);
+
+    if (picked != null) {
+      setState(() {
+        toDate = picked;
+      });
+    }
   }
 
+  /// Limpia el filtro de fechas.
   void _clearDates() {
     setState(() {
       fromDate = null;
@@ -68,202 +109,434 @@ class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
     });
   }
 
+  /// Devuelve el inicio del día.
   DateTime _startOfDay(DateTime d) =>
-      DateTime(d.year, d.month, d.day, 0, 0, 0);
+      DateTime(
+        d.year,
+        d.month,
+        d.day,
+        0,
+        0,
+        0,
+      );
 
+  /// Devuelve el final del día.
   DateTime _endOfDay(DateTime d) =>
-      DateTime(d.year, d.month, d.day, 23, 59, 59);
+      DateTime(
+        d.year,
+        d.month,
+        d.day,
+        23,
+        59,
+        59,
+      );
 
+  /// Abre una URL externa.
   Future<void> _openUrl(String url) async {
+
     final uri = Uri.parse(url);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
   }
 
+  /// Descarga un archivo en la carpeta local de la aplicación.
   Future<String> _downloadToAppFolder({
     required String url,
     required String filename,
   }) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final safeName = filename.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    final file = File('${dir.path}/$safeName');
 
-    await Dio().download(url, file.path);
+    final dir =
+        await getApplicationDocumentsDirectory();
+
+    // Limpia caracteres inválidos del nombre.
+    final safeName = filename.replaceAll(
+      RegExp(r'[\\/:*?"<>|]'),
+      '_',
+    );
+
+    final file =
+        File('${dir.path}/$safeName');
+
+    // Descarga mediante Dio.
+    await Dio().download(
+      url,
+      file.path,
+    );
+
     return file.path;
   }
 
   @override
   Widget build(BuildContext context) {
-    final employeesStream = FirebaseFirestore.instance
-        .collection('employees')
-        .orderBy('createdAt', descending: true)
-        .snapshots();
+
+    /// Stream de empleados.
+    final employeesStream =
+        FirebaseFirestore.instance
+            .collection('employees')
+            .orderBy(
+              'createdAt',
+              descending: true,
+            )
+            .snapshots();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Justificantes'),
+        title: const Text(
+          'Justificantes',
+        ),
       ),
+
       body: SafeArea(
-        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        child: StreamBuilder<
+            QuerySnapshot<
+                Map<String, dynamic>>>(
           stream: employeesStream,
+
           builder: (context, empSnap) {
+
+            // Error cargando empleados.
             if (empSnap.hasError) {
               return Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding:
+                      const EdgeInsets.all(12),
+
                   child: Text(
                     'Error cargando empleados:\n${empSnap.error}',
+
                     textAlign: TextAlign.center,
                   ),
                 ),
               );
             }
 
+            // Indicador de carga.
             if (!empSnap.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(
+                child:
+                    CircularProgressIndicator(),
+              );
             }
 
-            final empDocs = empSnap.data!.docs;
+            final empDocs =
+                empSnap.data!.docs;
 
-            final Map<String, Map<String, String>> empMap = {
+            /// Mapa auxiliar de empleados.
+            final Map<
+                String,
+                Map<String, String>> empMap = {
+
               for (final d in empDocs)
+
                 d.id: {
-                  'name': (d.data()['name'] ?? '').toString(),
+                  'name':
+                      (d.data()['name'] ?? '')
+                          .toString(),
                 }
             };
 
+            /// Consulta base de justificantes.
             Query<Map<String, dynamic>> q =
-                FirebaseFirestore.instance.collection('absence_justifications');
+                FirebaseFirestore.instance
+                    .collection(
+                      'absence_justifications',
+                    );
 
-            if (selectedEmployeeId != null && selectedEmployeeId!.isNotEmpty) {
-              q = q.where('employeeId', isEqualTo: selectedEmployeeId);
+            // Filtro por empleado.
+            if (selectedEmployeeId != null &&
+                selectedEmployeeId!
+                    .isNotEmpty) {
+
+              q = q.where(
+                'employeeId',
+                isEqualTo:
+                    selectedEmployeeId,
+              );
             }
 
+            // Filtro fecha inicial.
             if (fromDate != null) {
               q = q.where(
                 'date',
+
                 isGreaterThanOrEqualTo:
-                    Timestamp.fromDate(_startOfDay(fromDate!)),
+                    Timestamp.fromDate(
+                  _startOfDay(fromDate!),
+                ),
               );
             }
 
+            // Filtro fecha final.
             if (toDate != null) {
               q = q.where(
                 'date',
-                isLessThanOrEqualTo: Timestamp.fromDate(_endOfDay(toDate!)),
+
+                isLessThanOrEqualTo:
+                    Timestamp.fromDate(
+                  _endOfDay(toDate!),
+                ),
               );
             }
 
-            q = q.orderBy('date', descending: true).orderBy(
+            // Orden.
+            q = q
+                .orderBy(
+                  'date',
+                  descending: true,
+                )
+                .orderBy(
                   'createdAt',
                   descending: true,
                 );
 
             return Padding(
-              padding: const EdgeInsets.all(12),
+              padding:
+                  const EdgeInsets.all(12),
+
               child: Column(
                 children: [
+
+                  /// Zona de filtros.
                   LayoutBuilder(
-                    builder: (context, constraints) {
+                    builder:
+                        (context, constraints) {
+
                       return SingleChildScrollView(
-                        physics: const NeverScrollableScrollPhysics(),
+                        physics:
+                            const NeverScrollableScrollPhysics(),
+
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          crossAxisAlignment:
+                              CrossAxisAlignment
+                                  .stretch,
+
                           children: [
+
+                            /// Buscador y selector de empleado.
                             Wrap(
                               spacing: 10,
                               runSpacing: 10,
+
                               children: [
+
+                                /// Campo búsqueda.
                                 SizedBox(
-                                  width: constraints.maxWidth >= 600
-                                      ? constraints.maxWidth - 260
-                                      : constraints.maxWidth,
+                                  width:
+                                      constraints.maxWidth >=
+                                              600
+                                          ? constraints
+                                                  .maxWidth -
+                                              260
+                                          : constraints
+                                              .maxWidth,
+
                                   child: TextField(
-                                    controller: searchCtrl,
-                                    decoration: const InputDecoration(
+                                    controller:
+                                        searchCtrl,
+
+                                    decoration:
+                                        const InputDecoration(
                                       labelText:
                                           'Buscar (nombre, motivo, archivo)',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.search),
+
+                                      border:
+                                          OutlineInputBorder(),
+
+                                      prefixIcon:
+                                          Icon(
+                                        Icons.search,
+                                      ),
                                     ),
-                                    onChanged: (_) => setState(() {}),
+
+                                    onChanged:
+                                        (_) =>
+                                            setState(
+                                              () {},
+                                            ),
                                   ),
                                 ),
-                                SizedBox(
-                                  width: constraints.maxWidth >= 600
-                                      ? 240
-                                      : constraints.maxWidth,
-                                  child: DropdownButtonFormField<String?>(
-                                    value: selectedEmployeeId,
-                                    isExpanded: true,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Empleado',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    items: [
-                                      const DropdownMenuItem<String?>(
-                                        value: null,
-                                        child: Text('Todos'),
-                                      ),
-                                      ...empDocs.map((d) {
-                                        final e = d.data();
-                                        final name =
-                                            (e['name'] ?? '').toString();
 
-                                        return DropdownMenuItem<String?>(
-                                          value: d.id,
-                                          child: Text(
-                                            name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        );
-                                      }),
+                                /// Selector empleado.
+                                SizedBox(
+                                  width:
+                                      constraints.maxWidth >=
+                                              600
+                                          ? 240
+                                          : constraints
+                                              .maxWidth,
+
+                                  child:
+                                      DropdownButtonFormField<
+                                          String?>(
+                                    initialValue:
+                                        selectedEmployeeId,
+
+                                    isExpanded:
+                                        true,
+
+                                    decoration:
+                                        const InputDecoration(
+                                      labelText:
+                                          'Empleado',
+
+                                      border:
+                                          OutlineInputBorder(),
+                                    ),
+
+                                    items: [
+
+                                      /// Opción todos.
+                                      const DropdownMenuItem<
+                                          String?>(
+                                        value: null,
+
+                                        child: Text(
+                                          'Todos',
+                                        ),
+                                      ),
+
+                                      ...empDocs.map(
+                                        (d) {
+
+                                          final e =
+                                              d.data();
+
+                                          final name =
+                                              (e['name'] ??
+                                                      '')
+                                                  .toString();
+
+                                          return DropdownMenuItem<
+                                              String?>(
+                                            value:
+                                                d.id,
+
+                                            child:
+                                                Text(
+                                              name,
+
+                                              maxLines:
+                                                  1,
+
+                                              overflow:
+                                                  TextOverflow
+                                                      .ellipsis,
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ],
-                                    onChanged: (v) =>
-                                        setState(() => selectedEmployeeId = v),
+
+                                    onChanged:
+                                        (v) {
+
+                                      setState(() {
+                                        selectedEmployeeId =
+                                            v;
+                                      });
+                                    },
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
+
+                            const SizedBox(
+                              height: 10,
+                            ),
+
+                            /// Filtros de fechas.
                             Wrap(
                               spacing: 10,
                               runSpacing: 10,
+
                               children: [
+
+                                /// Fecha desde.
                                 SizedBox(
-                                  width: constraints.maxWidth >= 600
-                                      ? (constraints.maxWidth / 2) - 10
-                                      : constraints.maxWidth,
-                                  child: OutlinedButton.icon(
-                                    onPressed: _pickFromDate,
-                                    icon: const Icon(Icons.date_range),
+                                  width:
+                                      constraints.maxWidth >=
+                                              600
+                                          ? (constraints.maxWidth /
+                                                  2) -
+                                              10
+                                          : constraints
+                                              .maxWidth,
+
+                                  child:
+                                      OutlinedButton.icon(
+                                    onPressed:
+                                        _pickFromDate,
+
+                                    icon:
+                                        const Icon(
+                                      Icons
+                                          .date_range,
+                                    ),
+
                                     label: Text(
-                                      fromDate == null
+                                      fromDate ==
+                                              null
                                           ? 'Desde'
-                                          : df.format(fromDate!),
+                                          : df.format(
+                                              fromDate!,
+                                            ),
                                     ),
                                   ),
                                 ),
+
+                                /// Fecha hasta.
                                 SizedBox(
-                                  width: constraints.maxWidth >= 600
-                                      ? (constraints.maxWidth / 2) - 10
-                                      : constraints.maxWidth,
-                                  child: OutlinedButton.icon(
-                                    onPressed: _pickToDate,
-                                    icon: const Icon(Icons.date_range),
+                                  width:
+                                      constraints.maxWidth >=
+                                              600
+                                          ? (constraints.maxWidth /
+                                                  2) -
+                                              10
+                                          : constraints
+                                              .maxWidth,
+
+                                  child:
+                                      OutlinedButton.icon(
+                                    onPressed:
+                                        _pickToDate,
+
+                                    icon:
+                                        const Icon(
+                                      Icons
+                                          .date_range,
+                                    ),
+
                                     label: Text(
-                                      toDate == null
+                                      toDate ==
+                                              null
                                           ? 'Hasta'
-                                          : df.format(toDate!),
+                                          : df.format(
+                                              toDate!,
+                                            ),
                                     ),
                                   ),
                                 ),
+
+                                /// Botón limpiar fechas.
                                 IconButton(
-                                  tooltip: 'Limpiar fechas',
-                                  onPressed: (fromDate != null || toDate != null)
-                                      ? _clearDates
-                                      : null,
-                                  icon: const Icon(Icons.clear),
+                                  tooltip:
+                                      'Limpiar fechas',
+
+                                  onPressed:
+                                      (fromDate !=
+                                                  null ||
+                                              toDate !=
+                                                  null)
+                                          ? _clearDates
+                                          : null,
+
+                                  icon:
+                                      const Icon(
+                                    Icons.clear,
+                                  ),
                                 ),
                               ],
                             ),
@@ -272,192 +545,406 @@ class _AdminJustificationsPageState extends State<AdminJustificationsPage> {
                       );
                     },
                   ),
+
                   const SizedBox(height: 12),
+
+                  /// Lista de justificantes.
                   Expanded(
-                    child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    child: StreamBuilder<
+                        QuerySnapshot<
+                            Map<String, dynamic>>>(
                       stream: q.snapshots(),
+
                       builder: (context, snap) {
+
+                        // Error de carga.
                         if (snap.hasError) {
                           return Center(
                             child: Padding(
-                              padding: const EdgeInsets.all(12),
+                              padding:
+                                  const EdgeInsets.all(
+                                12,
+                              ),
+
                               child: Text(
                                 'Error cargando justificantes:\n${snap.error}',
-                                textAlign: TextAlign.center,
+
+                                textAlign:
+                                    TextAlign.center,
                               ),
                             ),
                           );
                         }
 
+                        // Cargando.
                         if (!snap.hasData) {
                           return const Center(
-                            child: CircularProgressIndicator(),
+                            child:
+                                CircularProgressIndicator(),
                           );
                         }
 
-                        final docs = snap.data!.docs;
+                        final docs =
+                            snap.data!.docs;
 
+                        // Sin justificantes.
                         if (docs.isEmpty) {
                           return const Center(
-                            child: Text('No hay justificantes.'),
+                            child: Text(
+                              'No hay justificantes.',
+                            ),
                           );
                         }
 
-                        final queryText = searchCtrl.text.trim().toLowerCase();
+                        /// Texto búsqueda.
+                        final queryText =
+                            searchCtrl.text
+                                .trim()
+                                .toLowerCase();
 
-                        final filtered = docs.where((doc) {
-                          if (queryText.isEmpty) return true;
+                        /// Filtrado manual.
+                        final filtered =
+                            docs.where((doc) {
 
-                          final data = doc.data();
+                          if (queryText.isEmpty) {
+                            return true;
+                          }
+
+                          final data =
+                              doc.data();
+
                           final employeeId =
-                              (data['employeeId'] ?? '').toString();
-                          final reason = (data['reason'] ?? '').toString();
-                          final filename = (data['filename'] ?? '').toString();
+                              (data['employeeId'] ??
+                                      '')
+                                  .toString();
 
-                          final emp = empMap[employeeId];
-                          final empName = emp?['name'] ?? '';
+                          final reason =
+                              (data['reason'] ??
+                                      '')
+                                  .toString();
+
+                          final filename =
+                              (data['filename'] ??
+                                      '')
+                                  .toString();
+
+                          final emp =
+                              empMap[employeeId];
+
+                          final empName =
+                              emp?['name'] ?? '';
 
                           final haystack =
-                              '$empName $reason $filename'.toLowerCase();
+                              '$empName $reason $filename'
+                                  .toLowerCase();
 
-                          return haystack.contains(queryText);
+                          return haystack.contains(
+                            queryText,
+                          );
+
                         }).toList();
 
+                        // Sin resultados.
                         if (filtered.isEmpty) {
                           return const Center(
                             child: Padding(
-                              padding: EdgeInsets.all(16),
+                              padding:
+                                  EdgeInsets.all(
+                                16,
+                              ),
+
                               child: Text(
                                 'No hay resultados con ese filtro/búsqueda.',
-                                textAlign: TextAlign.center,
+
+                                textAlign:
+                                    TextAlign.center,
                               ),
                             ),
                           );
                         }
 
                         return ListView.separated(
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const Divider(),
-                          itemBuilder: (context, i) {
-                            final data = filtered[i].data();
+                          itemCount:
+                              filtered.length,
+
+                          separatorBuilder:
+                              (_, __) =>
+                                  const Divider(),
+
+                          itemBuilder:
+                              (context, i) {
+
+                            final data =
+                                filtered[i].data();
 
                             final employeeId =
-                                (data['employeeId'] ?? '').toString();
-                            final reason = (data['reason'] ?? '').toString();
+                                (data['employeeId'] ??
+                                        '')
+                                    .toString();
+
+                            final reason =
+                                (data['reason'] ??
+                                        '')
+                                    .toString();
+
                             final filename =
-                                (data['filename'] ?? '').toString();
+                                (data['filename'] ??
+                                        '')
+                                    .toString();
+
                             final url =
-                                (data['downloadUrl'] ?? '').toString();
+                                (data['downloadUrl'] ??
+                                        '')
+                                    .toString();
+
                             final contentType =
-                                (data['contentType'] ?? '').toString();
+                                (data['contentType'] ??
+                                        '')
+                                    .toString();
 
-                            final dateTs = data['date'] as Timestamp?;
-                            final date = dateTs?.toDate();
+                            final dateTs =
+                                data['date']
+                                    as Timestamp?;
 
-                            final emp = empMap[employeeId];
+                            final date =
+                                dateTs?.toDate();
+
+                            final emp =
+                                empMap[employeeId];
+
                             final empName =
-                                (emp?['name'] ?? 'Empleado desconocido').trim();
+                                (emp?['name'] ??
+                                        'Empleado desconocido')
+                                    .trim();
 
-                            final isPdf = contentType.contains('pdf') ||
-                                filename.toLowerCase().endsWith('.pdf');
+                            /// Detecta si el archivo es PDF.
+                            final isPdf =
+                                contentType.contains(
+                                      'pdf',
+                                    ) ||
+                                    filename
+                                        .toLowerCase()
+                                        .endsWith(
+                                          '.pdf',
+                                        );
 
-                            final cleanReason = reason.trim();
-                            final titleText = cleanReason.isNotEmpty
-                                ? '$empName - $cleanReason'
-                                : empName;
+                            final cleanReason =
+                                reason.trim();
 
+                            /// Texto principal.
+                            final titleText =
+                                cleanReason
+                                        .isNotEmpty
+                                    ? '$empName - $cleanReason'
+                                    : empName;
+
+                            /// Texto secundario.
                             final subtitleText =
                                 '${date != null ? df.format(date) : "-"} · $filename';
 
                             return ListTile(
+
+                              /// Icono según tipo archivo.
                               leading: Icon(
-                                isPdf ? Icons.picture_as_pdf : Icons.image,
+                                isPdf
+                                    ? Icons
+                                        .picture_as_pdf
+                                    : Icons.image,
                               ),
+
                               title: Text(
                                 titleText,
+
                                 maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+
+                                overflow:
+                                    TextOverflow
+                                        .ellipsis,
                               ),
+
                               subtitle: Text(
                                 subtitleText,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                tooltip: 'Opciones',
-                                onSelected: (value) async {
-                                  if (url.isEmpty) return;
 
-                                  if (value == 'open') {
-                                    await _openUrl(url);
+                                maxLines: 2,
+
+                                overflow:
+                                    TextOverflow
+                                        .ellipsis,
+                              ),
+
+                              /// Menú de acciones.
+                              trailing:
+                                  PopupMenuButton<
+                                      String>(
+                                tooltip:
+                                    'Opciones',
+
+                                onSelected:
+                                    (
+                                      value,
+                                    ) async {
+
+                                  if (url.isEmpty) {
                                     return;
                                   }
 
-                                  if (value == 'download') {
+                                  /// Abrir archivo.
+                                  if (value ==
+                                      'open') {
+
+                                    await _openUrl(
+                                      url,
+                                    );
+
+                                    return;
+                                  }
+
+                                  /// Descargar archivo.
+                                  if (value ==
+                                      'download') {
+
                                     try {
+
+                                      /// En web se abre navegador.
                                       if (kIsWeb) {
-                                        await _openUrl(url);
-                                        if (context.mounted) {
-                                          AppSnackbar.show(
+
+                                        await _openUrl(
+                                          url,
+                                        );
+
+                                        if (context
+                                            .mounted) {
+
+                                          AppSnackbar
+                                              .show(
                                             context,
+
                                             'Abierto en el navegador (descarga desde ahí).',
                                           );
                                         }
+
                                         return;
                                       }
 
-                                      final path = await _downloadToAppFolder(
+                                      /// Descarga local.
+                                      final path =
+                                          await _downloadToAppFolder(
                                         url: url,
-                                        filename: filename.isNotEmpty
-                                            ? filename
-                                            : 'justificante',
+
+                                        filename:
+                                            filename.isNotEmpty
+                                                ? filename
+                                                : 'justificante',
                                       );
 
-                                      await OpenFilex.open(path);
+                                      /// Abre archivo descargado.
+                                      await OpenFilex
+                                          .open(
+                                        path,
+                                      );
 
-                                      if (context.mounted) {
-                                        AppSnackbar.show(
+                                      if (context
+                                          .mounted) {
+
+                                        AppSnackbar
+                                            .show(
                                           context,
+
                                           'Descargado en: $path',
                                         );
                                       }
+
                                     } catch (e) {
-                                      if (context.mounted) {
-                                        AppSnackbar.show(
+
+                                      if (context
+                                          .mounted) {
+
+                                        AppSnackbar
+                                            .show(
                                           context,
+
                                           'Error descargando: $e',
-                                          isError: true,
+
+                                          isError:
+                                              true,
                                         );
                                       }
                                     }
                                   }
                                 },
-                                itemBuilder: (_) => [
+
+                                itemBuilder:
+                                    (_) => [
+
+                                  /// Abrir archivo.
                                   PopupMenuItem(
-                                    value: 'open',
-                                    enabled: url.isNotEmpty,
-                                    child: const Row(
+                                    value:
+                                        'open',
+
+                                    enabled:
+                                        url
+                                            .isNotEmpty,
+
+                                    child:
+                                        const Row(
                                       children: [
-                                        Icon(Icons.open_in_new, size: 18),
-                                        SizedBox(width: 8),
-                                        Text('Abrir'),
+                                        Icon(
+                                          Icons
+                                              .open_in_new,
+
+                                          size: 18,
+                                        ),
+
+                                        SizedBox(
+                                          width: 8,
+                                        ),
+
+                                        Text(
+                                          'Abrir',
+                                        ),
                                       ],
                                     ),
                                   ),
+
+                                  /// Descargar archivo.
                                   PopupMenuItem(
-                                    value: 'download',
-                                    enabled: url.isNotEmpty,
-                                    child: const Row(
+                                    value:
+                                        'download',
+
+                                    enabled:
+                                        url
+                                            .isNotEmpty,
+
+                                    child:
+                                        const Row(
                                       children: [
-                                        Icon(Icons.download, size: 18),
-                                        SizedBox(width: 8),
-                                        Text('Descargar'),
+                                        Icon(
+                                          Icons
+                                              .download,
+
+                                          size: 18,
+                                        ),
+
+                                        SizedBox(
+                                          width: 8,
+                                        ),
+
+                                        Text(
+                                          'Descargar',
+                                        ),
                                       ],
                                     ),
                                   ),
                                 ],
                               ),
-                              onTap: url.isEmpty ? null : () => _openUrl(url),
+
+                              /// Apertura rápida pulsando el elemento.
+                              onTap: url.isEmpty
+                                  ? null
+                                  : () =>
+                                      _openUrl(
+                                        url,
+                                      ),
                             );
                           },
                         );
