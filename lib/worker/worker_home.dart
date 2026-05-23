@@ -449,13 +449,20 @@ class _WorkerHomeState extends State<WorkerHome> {
           ),
 
           /// Barra inferior de navegación.
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _tabIndex,
-
-            onDestinationSelected: (i) {
-              setState(() => _tabIndex = i);
-            },
-
+          bottomNavigationBar: NavigationBarTheme(
+            data: NavigationBarThemeData(
+              labelTextStyle: WidgetStateProperty.all(
+                const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            child: NavigationBar(
+              selectedIndex: _tabIndex,
+              onDestinationSelected: (i) {
+                setState(() => _tabIndex = i);
+              },
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.fingerprint),
@@ -479,6 +486,7 @@ class _WorkerHomeState extends State<WorkerHome> {
               ),
             ],
           ),
+          )
         );
       },
     );
