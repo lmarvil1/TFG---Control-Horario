@@ -511,14 +511,32 @@ class _AdminIncidentsPageState
 
       builder: (context, snap) {
 
-        final raw =
-            snap.data?.data()?['name'];
+        if (snap.connectionState ==
+            ConnectionState.waiting) {
+          return const Text(
+            'Cargando...',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+            ),
+          );
+        }
+
+        if (!snap.hasData ||
+            !snap.data!.exists) {
+          return const Text(
+            'Empleado',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+            ),
+          );
+        }
 
         final name =
-            (raw ?? 'Empleado')
-                .toString();
+            snap.data!
+                .data()?['name']
+                ?.toString() ??
+            'Empleado';
 
-        // Guarda en caché.
         _employeeNameCache[employeeId] =
             name;
 
@@ -528,7 +546,7 @@ class _AdminIncidentsPageState
             fontWeight: FontWeight.w600,
           ),
         );
-      },
+      }
     );
   }
 
